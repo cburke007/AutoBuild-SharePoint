@@ -1,5 +1,5 @@
 ﻿#* FileName: AutoBuild.ps1
-#* Version 1.0
+#* Version 3.0
 #*=============================================
 #* Script Name: [AutoBuild.ps1]
 #* Created: [6/2/2011]
