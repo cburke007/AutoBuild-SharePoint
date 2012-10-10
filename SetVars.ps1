@@ -707,7 +707,7 @@ function AddServiceAppNode
 			elseif($crawlStoreDB){Write-Host "6. CrawlStore Database Name: 				$crawlStoreDB"}
 			if($socialDB){Write-Host "7. Social Database Name: 				$socialDB"}
 			Write-Host "default. Done"
-			$answer = Read-Host "Choose which paramaeter to change for $servAppType: "
+			$answer = Read-Host "Choose which paramaeter to change for $servAppType "
 			
 			if($whDBName)
 			{
