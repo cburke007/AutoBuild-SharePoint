@@ -1,17 +1,33 @@
 ﻿#Region Get NetBios name for current domain
 #Function Get NetBios Name for current AD
-function Get-DomainNetBios
+function Get-LocalLogonInformation
 {
-    $a = "LDAP://CN=Partitions," + ([ADSI]'LDAP://RootDSE').configurationNamingContext
-    $b = [ADSI] $a
-    foreach($index in $b.children)
+    try
     {
-        $e = [ADSI] $index.path
-        
-        if ($e.nCName -eq ([ADSI]'LDAP://RootDSE').defaultNamingContext)
-        {
-            $e.nETBIOSName
+
+        $ADSystemInfo = New-Object -ComObject ADSystemInfo
+
+        $type = $ADSystemInfo.GetType()
+
+        New-Object -TypeName PSObject -Property @{
+
+            UserDistinguishedName = $type.InvokeMember('UserName','GetProperty',$null,$ADSystemInfo,$null)
+            ComputerDistinguishedName = $type.InvokeMember('ComputerName','GetProperty',$null,$ADSystemInfo,$null)
+            SiteName = $type.InvokeMember('SiteName','GetProperty',$null,$ADSystemInfo,$null)
+            DomainShortName = $type.InvokeMember('DomainShortName','GetProperty',$null,$ADSystemInfo,$null)
+            DomainDNSName = $type.InvokeMember('DomainDNSName','GetProperty',$null,$ADSystemInfo,$null)
+            ForestDNSName = $type.InvokeMember('ForestDNSName','GetProperty',$null,$ADSystemInfo,$null)
+            PDCRoleOwnerDistinguishedName = $type.InvokeMember('PDCRoleOwner','GetProperty',$null,$ADSystemInfo,$null)
+            SchemaRoleOwnerDistinguishedName = $type.InvokeMember('SchemaRoleOwner','GetProperty',$null,$ADSystemInfo,$null)
+            IsNativeModeDomain = $type.InvokeMember('IsNativeMode','GetProperty',$null,$ADSystemInfo,$null)
         }
+
+    }
+
+    catch
+    {
+
+        throw
     }
 }
 #EndRegion
@@ -71,7 +87,7 @@ function New-BCSApp
 		
 	if((Get-SPServiceApplication | ?{$_.Name -eq $saName}) -eq $null)
 	{	
-		$netbios = Get-DomainNetBios	
+		$netbios = (Get-LocalLogonInformation).DomainShortName	
 		$domSAAppPoolUser ="$netbios\$saAppPoolUser" 
 		#Check/Create Managed Account
 		Set-ManagedAcct $domSAAppPoolUser $saAppPoolPass
@@ -98,7 +114,7 @@ function New-MMDataApp
 		## Create a Metadata Service Application
 		If((Get-SPServiceApplication | ?{$_.Name -eq $saName}) -eq $null)
 	  	{   		           
-			$netbios = Get-DomainNetBios	
+			$netbios = (Get-LocalLogonInformation).DomainShortName	
 			$domSAAppPoolUser = "$netbios\$saAppPoolUser" 
 			$domFarmAcct = "$netbios\$farmAcct"
 			#Check/Create Managed Account
@@ -158,7 +174,7 @@ function New-UserProfileApp
 		## Create a Profile Service Application
       	If ((Get-SPServiceApplication | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Administration.UserProfileApplication"}) -eq $null)
 	  	{   
-            $netbios = Get-DomainNetBios	
+            $netbios = (Get-LocalLogonInformation).DomainShortName	
 			$domSAAppPoolUser = "$netbios\$saAppPoolUser"
 			$domFarmAcct = "$netbios\$farmAcct"
 			#Check/Create Managed Account
@@ -296,7 +312,7 @@ function New-SecureStoreApp
 	
 	try
 	{
-        $netbios = Get-DomainNetBios	
+        $netbios = (Get-LocalLogonInformation).DomainShortName	
 		$domSAAppPoolUser = "$netbios\$saAppPoolUser" 
 		$domFarmAcct = "$netbios\$farmAcct"
 		#Check/Create Managed Account
@@ -344,7 +360,7 @@ function New-WebAnalyticsApp
 {
 	param([string]$saName, [string]$appPoolName, [string]$whdbServer, [string]$whdbName, [string]$stagedbServer, [string]$stagedbName, [string]$saAppPoolUser, [string]$saAppPoolPass)
 	
-	$netbios = Get-DomainNetBios	
+	$netbios = (Get-LocalLogonInformation).DomainShortName	
 	$domSAAppPoolUser = "$netbios\$saAppPoolUser" 
 	$domFarmAcct = "$netbios\$farmAcct"
 	#Check/Create Managed Account
@@ -370,7 +386,7 @@ function New-VisioApp
 {               
     param([string]$saName, [string]$appPoolName, [string]$saAppPoolUser, [string]$saAppPoolPass)
 	
-	$netbios = Get-DomainNetBios	
+	$netbios = (Get-LocalLogonInformation).DomainShortName	
 	$domSAAppPoolUser = "$netbios\$saAppPoolUser" 
 	$domFarmAcct = "$netbios\$farmAcct"
 	#Check/Create Managed Account
@@ -394,7 +410,7 @@ function New-PerfPointApp
 {  
     param([string]$saName, [string]$appPoolName, [string]$saAppPoolUser, [string]$saAppPoolPass)
 	
-	$netbios = Get-DomainNetBios	
+	$netbios = (Get-LocalLogonInformation).DomainShortName	
 	$domSAAppPoolUser = "$netbios\$saAppPoolUser" 
 	$domFarmAcct = "$netbios\$farmAcct"
 	#Check/Create Managed Account
@@ -418,7 +434,7 @@ function New-AccessApp
 {
 	param([string]$saName, [string]$appPoolName, [string]$saAppPoolUser, [string]$saAppPoolPass)
 	
-	$netbios = Get-DomainNetBios	
+	$netbios = (Get-LocalLogonInformation).DomainShortName	
 	$domSAAppPoolUser = "$netbios\$saAppPoolUser" 
 	$domFarmAcct = "$netbios\$farmAcct"
 	#Check/Create Managed Account
@@ -441,7 +457,7 @@ function New-ExcelApp
 {
 	param([string]$saName, [string]$appPoolName, [string]$saAppPoolUser, [string]$saAppPoolPass)
 	
-	$netbios = Get-DomainNetBios	
+	$netbios = (Get-LocalLogonInformation).DomainShortName	
 	$domSAAppPoolUser = "$netbios\$saAppPoolUser" 
 	$domFarmAcct = "$netbios\$farmAcct"
 	#Check/Create Managed Account
@@ -465,7 +481,7 @@ function New-WordApp
 {
 	param([string]$saName, [string]$appPoolName, [string]$dbServer, [string]$dbName, [string]$saAppPoolUser, [string]$saAppPoolPass)
 	
-	$netbios = Get-DomainNetBios	
+	$netbios = (Get-LocalLogonInformation).DomainShortName	
 	$domSAAppPoolUser = "$netbios\$saAppPoolUser" 
 	$domFarmAcct = "$netbios\$farmAcct"
 	#Check/Create Managed Account
@@ -490,7 +506,7 @@ function New-EnterpriseSearchApp
 		
 	if((Get-SPServiceApplication | ?{$_.Name -eq $saName}) -eq $null)
 	{
-		$netbios = Get-DomainNetBios	
+		$netbios = (Get-LocalLogonInformation).DomainShortName	
 		$domSAAppPoolUser = "$netbios\$saAppPoolUser" 
 		$domFarmAcct = "$netbios\$farmAcct"
 		#Check/Create Managed Account

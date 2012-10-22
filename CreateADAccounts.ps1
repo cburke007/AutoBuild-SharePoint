@@ -5,7 +5,7 @@ Import-Module ./AutoBuild-Module
 # Get current script execution path
 [string]$curloc = get-location
 
-$netbios = Get-DomainNetBios
+$netbios = (Get-LocalLogonInformation).DomainShortName
 
 # Open/Create the Users.txt file    
 $text = "$curloc\ServiceAccounts.txt"

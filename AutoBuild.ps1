@@ -83,7 +83,7 @@ if($serviceAcctLog -eq $null)
 	$FarmAcctNode = $FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Type = 'Farm Connect']")
 	$FarmAcct = $FarmAcctNode.Name
 	
-	$netBios = Get-DomainNetBios
+	$netBios = (Get-LocalLogonInformation).DomainShortName
 	
 	# Get the DB Server Name
 	$dbServer = Get-ServerNameByService $FarmConfigXML "Microsoft SharePoint Foundation Database"
@@ -101,16 +101,10 @@ if($serviceAcctLog -eq $null)
 }
 # End Region Create AD Service Accounts
 
-if($FarmConfigXML.Customer.Farm.BuildVersion -like "14*")
-{
-    # Install 2010 Bits
-    ./Install2010Bits.ps1
-}
-elseif($FarmConfigXML.Customer.Farm.BuildVersion -like "15*")
-{
-     # Install 2013 Bits
-    ./Install2013Bits.ps1
-}
+
+# Region Install SharePoint binaries
+./InstallSPBits.ps1
+# End Region
 
 # Make sure necessary windows services are started and set to Automatic
 foreach ($serviceToStart in $servicesToStart)

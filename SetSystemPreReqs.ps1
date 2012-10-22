@@ -2,7 +2,7 @@
 
 $FarmConfigXML = [xml](get-content "$curloc\FarmConfig.xml" -EA 0)
 
-$netBios = Get-DomainNetBios
+$netBios = (Get-LocalLogonInformation).DomainShortName
 
 # Get OS Version
 $QueryOS = Gwmi Win32_OperatingSystem

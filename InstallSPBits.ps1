@@ -5,9 +5,13 @@ $bits = Get-Item $curloc | Split-Path -Parent
 
 #Install Pre-requisites
 Write-Host -ForegroundColor Cyan "- Installing SharePoint Pre-Requisites..."
-If (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\14\BIN\stsadm.exe") #Crude way of checking if SP2010 is already installed
+If (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\14\BIN\stsadm.exe") #Checking if SP2010 is already installed
 {
 	Write-Host -ForegroundColor Cyan "- SP2010 prerequisites appear be already installed - skipping installation."
+}
+ElseIf (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\15\BIN\stsadm.exe") #Checking if SP2013 is already installed
+{
+	Write-Host -ForegroundColor Cyan "- SP2013 prerequisites appear be already installed - skipping installation."
 }
 Else
 {
@@ -66,9 +70,13 @@ Else
 #Region Install SharePoint Bits
 Function InstallSharePoint
 {
-If  (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\14\BIN\stsadm.exe") #Crude way of checking if SP2010 is already installed
+If (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\14\BIN\stsadm.exe") #Checking if SP2010 is already installed
 {
 	Write-Host -ForegroundColor Cyan "- SP2010 binaries appear to be already installed - skipping installation."
+}
+ElseIf (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\15\BIN\stsadm.exe") #Checking if SP2013 is already installed
+{
+	Write-Host -ForegroundColor Cyan "- SP2013 binaries appear to be already installed - skipping installation."
 }
 Else
 {
@@ -130,51 +138,3 @@ Else
 }
 InstallSharepoint
 #End Region Install SharePoint Bits
-
-#Region Install Language Packs
-## Detects any language packs in $bits\LanguagePacks folder and installs them.
-
-## Look for Server language packs
-$ServerLanguagePacks = (Get-ChildItem "$bits\LanguagePacks" -Name -Include ServerLanguagePack*.exe -ErrorAction SilentlyContinue)
-If ($ServerLanguagePacks)
-{
-	Write-Host -ForegroundColor Cyan "- Installing SharePoint (Server) Language Packs:"
-	## Get installed languages from registry (HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Office Server\15.0\InstalledLanguages)
-    $InstalledOfficeServerLanguages = (Get-Item "HKLM:\Software\Microsoft\Office Server\14.0\InstalledLanguages").GetValueNames() | ? {$_ -ne ""}
-
-	ForEach ($LanguagePack in $ServerLanguagePacks)
-	{
-        ## Slightly convoluted check to see if language pack is already installed, based on name of language pack file.
-        ## This only works if you've renamed your language pack(s) to follow the convention "ServerLanguagePack_XX-XX.exe" where <XX-XX> is a culture such as <en-us>.
-		$Language = $InstalledOfficeServerLanguages | ? {$_ -eq (($LanguagePack -replace "ServerLanguagePack_","") -replace ".exe","")}
-        If (!$Language)
-        {
-	        Write-Host -ForegroundColor Cyan " - Installing $LanguagePack..." -NoNewline
-	        Start-Process -FilePath "$bits\LanguagePacks\$LanguagePack" -ArgumentList "/quiet /norestart"
-	        While (Get-Process -Name ($LanguagePack -replace ".exe", "") -ErrorAction SilentlyContinue)
-	        {
-	        	Write-Host -ForegroundColor Cyan "." -NoNewline
-	        	sleep 5
-	        }
-   		    Write-Host -BackgroundColor Blue -ForegroundColor Black "Done."
-        }
-        Else
-        {
-            Write-Host -ForegroundColor Cyan " - Language $Language already appears to be installed, skipping."
-        }
-	}
-	Write-Host -ForegroundColor Cyan " - Language Pack installation complete."
-}
-Else {Write-Host -ForegroundColor Cyan " - No language packs found in $bits\LanguagePacks, skipping."}
-
-#Get Installed Languages
-$InstalledOfficeServerLanguages = (Get-Item "HKLM:\Software\Microsoft\Office Server\14.0\InstalledLanguages").GetValueNames() | ? {$_ -ne ""}
-
-#List each installed Language
-Write-Host -ForegroundColor Cyan " - Currently installed languages:" 
-ForEach ($Language in $InstalledOfficeServerLanguages)
-{
-	#Write-Host -ForegroundColor Cyan "  -"$Language.DisplayName
-	Write-Host -ForegroundColor Cyan "  -" ([System.Globalization.CultureInfo]::GetCultureInfo($Language).DisplayName)
-}
-#End Region Install Language Packs

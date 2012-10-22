@@ -15,23 +15,8 @@
     </Farm>        
     </Customer>    
     '
-# Version of SharePoint
-Write-Host -ForegroundColor Cyan "What version of SharePoint is being installed? "
-Write-Host -ForegroundColor Cyan "1. SharePoint 2010"
-Write-Host -ForegroundColor Cyan "2. SharePoint 2013"
 
-$VerChoice = Read-Host "Select 1 or 2: "
-
-switch($VerChoice)
-{
-    1 {$Version = "14"}
-    2 {$Version = "15"}
-    default {$Version = "14"}
-}
-
-$FarmConfigXML.Customer.Farm.SetAttribute("BuildVersion", $Version)
-
-#Choose the edition of SharePoint 2010 you are installing
+#Choose the edition of SharePoint you are installing
 Write-Host -ForegroundColor Cyan "Choose your version (Default == Foundation)"
 Write-Host -ForegroundColor Cyan "1. Foundation"
 Write-Host -ForegroundColor Cyan "2. SearchServer"
@@ -45,7 +30,7 @@ $EdChoice = Read-Host "Select 1-6: "
 switch($EdChoice)
 {
     1 {$Edition = "Foundation"}
-    2 {$Edition = "Search Server 2010"}
+    2 {$Edition = "Search Server"}
     3 {$Edition = "Standard"}
     4 {$Edition = "Standard Internet"}
     5 {$Edition = "Enterprise"}
@@ -409,7 +394,7 @@ if($FarmConfigXML.Customer.Farm.UseCustomAccounts -eq "Y" -or $FarmConfigXML.Cus
     if(UserExists $SiteAdmin){$pass = Read-Host "User $SiteAdmin Exists! Please enter existing Password ";ServiceAcctElement $SiteAdmin "Default Site Admin" $pass}
     else{ServiceAcctElement $SiteAdmin "Default Site Admin"}
     
-    if($FarmConfigXML.Customer.Farm.LicenseLevel -eq "Search Server 2010" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard Internet" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise Internet")
+    if($FarmConfigXML.Customer.Farm.LicenseLevel -eq "Search Server" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard Internet" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise Internet")
     { 
         $SearchAP = Read-Host "What is the Search App Pool Account? "
         $SearchAP = $AcctPrefix + $SearchAP
@@ -546,7 +531,7 @@ else
             
     
     
-    if($FarmConfigXML.Customer.Farm.LicenseLevel -eq "Search Server 2010" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard Internet" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise Internet")
+    if($FarmConfigXML.Customer.Farm.LicenseLevel -eq "Search Server" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard Internet" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise Internet")
     {
         $SearchAP = $AcctPrefix + "SP_Search_AP"
         if(UserExists $SearchAP){$pass = Read-Host "User $SearchAP Exists! Please enter existing Password ";ServiceAcctElement $SearchAP "Search AppPool" $pass}
@@ -874,8 +859,8 @@ $appPoolName = GetAppPoolName "$appPoolAcct" "BCS Web Services" $defSAAppPoolAcc
 # Add the Service App Node to the Farm Config XML. Provide $custServiceApps, Service App Name, Service App Type, Database Name, DB Server, $appPoolName, $appPoolAcct, Partitioning, Proxy Group
 AddServiceAppNode "$custServiceApps" "Business Data Connectivity Services" "Business Data Connectivity Service Application" "BCSDB" "$dbServer" "$appPoolName" "$appPoolAcct" "UnPartitioned" "[default]"
 
-# Generate Search Server 2010 Service App Config
-if($FarmConfigXML.Customer.Farm.LicenseLevel -eq "Search Server 2010" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard Internet" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise Internet")
+# Generate Search Server Service App Config
+if($FarmConfigXML.Customer.Farm.LicenseLevel -eq "Search Server" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard Internet" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise Internet")
 {
 	# Build Search Admin Service App variables
 	# Get the App Pool Account from XML. Provide the Account Type and the Default SA AppPool Account Name
@@ -963,7 +948,7 @@ if($FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise" -or $FarmConfigXML
 	# Get the App Pool Name. Provide the AppPool Account, the Standard Custom App Pool Name, and the Default SA AppPool Account Name
 	$appPoolName = GetAppPoolName "$appPoolAcct" "Visio Web Services" $defSAAppPoolAcctName
 	# Add the Service App Node to the Farm Config XML. Provide $custServiceApps, Service App Name, Service App Type, Database Name, DB Server, $appPoolName, $appPoolAcct, Partitioning, Proxy Group
-	AddServiceAppNode "$custServiceApps" "Visio Graphics Services" "Access Services Application" "" "" "$appPoolName" "$appPoolAcct" "" "[default]"
+	AddServiceAppNode "$custServiceApps" "Visio Graphics Services" "Visio Graphics Service Application" "" "" "$appPoolName" "$appPoolAcct" "" "[default]"
 	
 	# Build Excel Service App variables
 	# Get the App Pool Account from XML. Provide the Account Type and the Default SA AppPool Account Name

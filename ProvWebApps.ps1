@@ -5,7 +5,7 @@ $acctNode=$FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[
 $siteAppPoolUser = $acctNode.Name
 $siteAppPoolPass = $acctNode.Password
 
-$netbios = Get-DomainNetBios	
+$netbios = (Get-LocalLogonInformation).DomainShortName	
 $domSiteAppPoolUser = "$netbios\$siteAppPoolUser" 
 
 #Check/Create Managed Account

@@ -12,18 +12,34 @@ function Suspend-Script
 }
 
 #Function Get NetBios Name for current AD
-function Get-DomainNetBios
+function Get-LocalLogonInformation
 {
-    $a = "LDAP://CN=Partitions," + ([ADSI]'LDAP://RootDSE').configurationNamingContext
-    $b = [ADSI] $a
-    foreach($index in $b.children)
+    try
     {
-        $e = [ADSI] $index.path
-        
-        if ($e.nCName -eq ([ADSI]'LDAP://RootDSE').defaultNamingContext)
-        {
-            $e.nETBIOSName
+
+        $ADSystemInfo = New-Object -ComObject ADSystemInfo
+
+        $type = $ADSystemInfo.GetType()
+
+        New-Object -TypeName PSObject -Property @{
+
+            UserDistinguishedName = $type.InvokeMember('UserName','GetProperty',$null,$ADSystemInfo,$null)
+            ComputerDistinguishedName = $type.InvokeMember('ComputerName','GetProperty',$null,$ADSystemInfo,$null)
+            SiteName = $type.InvokeMember('SiteName','GetProperty',$null,$ADSystemInfo,$null)
+            DomainShortName = $type.InvokeMember('DomainShortName','GetProperty',$null,$ADSystemInfo,$null)
+            DomainDNSName = $type.InvokeMember('DomainDNSName','GetProperty',$null,$ADSystemInfo,$null)
+            ForestDNSName = $type.InvokeMember('ForestDNSName','GetProperty',$null,$ADSystemInfo,$null)
+            PDCRoleOwnerDistinguishedName = $type.InvokeMember('PDCRoleOwner','GetProperty',$null,$ADSystemInfo,$null)
+            SchemaRoleOwnerDistinguishedName = $type.InvokeMember('SchemaRoleOwner','GetProperty',$null,$ADSystemInfo,$null)
+            IsNativeModeDomain = $type.InvokeMember('IsNativeMode','GetProperty',$null,$ADSystemInfo,$null)
         }
+
+    }
+
+    catch
+    {
+
+        throw
     }
 }
 
@@ -226,4 +242,4 @@ function New-ADUser
 #EndRegion Global Functions
 
 #Export Module Members
-Export-ModuleMember Suspend-Script, Get-DomainNetBios, Start-Service, Get-RandomPassword, Get-RandomText, Get-ComplexPassword, Set-SQLAccess, New-ADUser, Get-ServerNameByService
+Export-ModuleMember Suspend-Script, Get-LocalLogonInformation, Start-Service, Get-RandomPassword, Get-RandomText, Get-ComplexPassword, Set-SQLAccess, New-ADUser, Get-ServerNameByService

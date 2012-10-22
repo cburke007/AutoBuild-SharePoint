@@ -8,7 +8,7 @@ $dbServer = Get-ServerNameByService $FarmConfigXML "Microsoft SharePoint Foundat
 # Set common variables for install
 $FarmAcctNode = $FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Type='Farm Connect']")
 $FarmAcct = $FarmAcctNode.Name
-$netBios = Get-DomainNetBios
+$netBios = (Get-LocalLogonInformation).DomainShortName
 $domFarmAcct = "$netBios\$FarmAcct"
 $txtFarmAcctPWD = $FarmAcctNode.Password
 $FarmAcctPWD = ConvertTo-SecureString "$txtFarmAcctPWD" -asplaintext -force
