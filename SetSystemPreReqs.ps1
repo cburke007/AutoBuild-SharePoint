@@ -1,5 +1,8 @@
 ﻿Import-Module ./AutoBuild-Module
 
+# Get current script execution path
+[string]$curloc = get-location
+
 $FarmConfigXML = [xml](get-content "$curloc\FarmConfig.xml" -EA 0)
 
 $netBios = (Get-LocalLogonInformation).DomainShortName
@@ -38,6 +41,7 @@ If (-not ($MoMPathValue.ManagedSharepoint -eq "1"))
 # Create SQL Alias
 $dbServer = $FarmConfigXML.Customer.Farm.FarmDBServer
 $LsaPath = "HKLM:\SOFTWARE\Microsoft\MSSQLServer\Client\ConnectTo"
+if (-not (Test-Path $LsaPath)){md $LsaPath > $null}
 $LsaPathValue = Get-ItemProperty -path $LsaPath
 If ($LsaPathValue.SharePointSQL -eq $null)
 {
