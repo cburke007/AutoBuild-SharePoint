@@ -429,8 +429,31 @@ function New-PerfPointApp
 }
 #EndRegion
 
-#Region Access
-function New-AccessApp
+#Region Access 2010
+function New-2010AccessApp
+{
+	param([string]$saName, [string]$appPoolName, [string]$saAppPoolUser, [string]$saAppPoolPass)
+	
+	$netbios = (Get-LocalLogonInformation).DomainShortName	
+	$domSAAppPoolUser = "$netbios\$saAppPoolUser" 
+	$domFarmAcct = "$netbios\$farmAcct"
+	#Check/Create Managed Account
+	Set-ManagedAcct $domSAAppPoolUser $saAppPoolPass
+	#Create SA AppPool
+	$saAppPool = CreateSAAppPool $appPoolName $domSAAppPoolUser
+	
+	$GetSPSecureStoreServiceApplication = Get-SPServiceApplication | ?{$_.Name -eq $saName}
+	If ($GetSPSecureStoreServiceApplication -eq $Null)
+	{
+		Write-Host -ForegroundColor Cyan "Creating $saName and Proxy..."
+	    New-SPAccessServiceApplication -Name $saName -ApplicationPool $saAppPool -Default > $null
+	}
+	else{Write-Host -ForegroundColor Cyan "- $saName already exists. Continuing..."}
+}
+#EndRegion
+
+#Region Access 2013
+function New-2013AccessApp
 {
 	param([string]$saName, [string]$appPoolName, [string]$saAppPoolUser, [string]$saAppPoolPass)
 	
@@ -479,7 +502,7 @@ function New-ExcelApp
 #Region Word
 function New-WordApp
 {
-	param([string]$saName, [string]$appPoolName, [string]$dbServer, [string]$dbName, [string]$saAppPoolUser, [string]$saAppPoolPass)
+	param([string]$saName, [string]$appPoolName, [string]$dbServer, [string]$dbName, [string]$saAppPoolUser, [string]$saAppPoolPass, [string]$crawlAcct, [string]$crawlPass, [string]$searchServAcct, [string]$searchServPass)
 	
 	$netbios = (Get-LocalLogonInformation).DomainShortName	
 	$domSAAppPoolUser = "$netbios\$saAppPoolUser" 
@@ -500,7 +523,7 @@ function New-WordApp
 #EndRegion
 
 #Region Setup Enterprise Search
-function New-EnterpriseSearchApp
+function New-2010EnterpriseSearchApp
 { 
 	param([string]$saName, [string]$appPoolName, [string]$dbServer, [string]$dbName, [string]$saAppPoolUser, [string]$saAppPoolPass, [string]$searchServer)
 		
@@ -550,11 +573,102 @@ function New-EnterpriseSearchApp
 		$QueryTopology | Set-SPEnterpriseSearchQueryTopology -Active
 		
 	    Write-Host -ForegroundColor Cyan "  Creating Proxy..."
-	    $searchAppProxy = New-SPEnterpriseSearchServiceApplicationProxy -Name "$saName Proxy" -SearchApplication $saName > $null	    		
+	    $searchAppProxy = New-SPEnterpriseSearchServiceApplicationProxy -Name "$saName Proxy" -SearchApplication $saName > $null
+
+        Write-Host -ForegroundColor Cyan "  Setting Default Content Access Account..."
+        $contentAccess= New-Object Microsoft.Office.Server.Search.Administration.Content($searchApp) 
+        $contentAccess.SetDefaultGatheringAccount($crawlAcct, (ConvertTo-SecureString $crawlPass -AsPlainText -force))
+
+        Write-Host -ForegroundColor Cyan "  Setting Sharepoint Server Search Service Account..."
+        Set-SPEnterpriseSearchService -ServiceAccount $searchServAcct -ServicePassword (ConvertTo-SecureString $searchServPass -AsPlainText -force)  	    		
 	}
+    else{Write-Host -ForegroundColor Cyan "- $saName already exists. Continuing..."}
 }
 #EndRegion
-          
+
+#Region New 2013 Search App
+function New-2013EnterpriseSearchApp
+{
+    param([string]$saName, [string]$appPoolName, [string]$dbServer, [string]$dbName, [string]$saAppPoolUser, [string]$saAppPoolPass, [string]$searchServer, [string]$crawlAcct, [string]$crawlPass, [string]$searchServAcct, [string]$searchServPass)
+		
+	if((Get-SPServiceApplication | ?{$_.Name -eq $saName}) -eq $null)
+	{
+        # Based on scripts at http://www.harbar.net/articles/sp2013mt.aspx via Todd Klindt
+        # Thanks Spence and Todd!
+
+        $netbios = (Get-LocalLogonInformation).DomainShortName	
+		$domSAAppPoolUser = "$netbios\$saAppPoolUser" 
+		$domFarmAcct = "$netbios\$farmAcct"
+		#Check/Create Managed Account
+		Set-ManagedAcct $domSAAppPoolUser $saAppPoolPass
+		#Create SA AppPool
+		$saAppPool = CreateSAAppPool $appPoolName $domSAAppPoolUser
+		
+		Write-Host -ForegroundColor Cyan "Creating $saName and Proxy..."
+
+        # Start Search Service Instances
+        Write-Host -ForegroundColor Cyan "Starting Search Service Instances..."
+        Start-SPEnterpriseSearchServiceInstance $searchServer
+        Start-SPEnterpriseSearchQueryAndSiteSettingsServiceInstance $searchServer
+
+        # Create the Search Service Application and Proxy
+        Write-Host -ForegroundColor Cyan "Creating Search Service Application..."
+        $searchApp = New-SPEnterpriseSearchServiceApplication -Name $saName -ApplicationPool $saAppPool -DatabaseName $searchDBName
+        
+        Write-Host -ForegroundColor Cyan "  Creating Proxy..."
+        $searchProxy = New-SPEnterpriseSearchServiceApplicationProxy -Name "$saName Proxy" -SearchApplication $searchApp
+
+        # Clone the default Topology (which is empty) and create a new one and then activate it
+        Write-Host -ForegroundColor Cyan "Configuring Search Component Topology..."
+        $clone = $searchApp.ActiveTopology.Clone()
+        $searchServiceInstance = Get-SPEnterpriseSearchServiceInstance
+        
+        Write-Host -ForegroundColor Cyan "  Creating Administration Component..."
+        New-SPEnterpriseSearchAdminComponent –SearchTopology $clone -SearchServiceInstance $searchServiceInstance
+        
+        Write-Host -ForegroundColor Cyan "  Creating Content Processing Component..."
+        New-SPEnterpriseSearchContentProcessingComponent –SearchTopology $clone -SearchServiceInstance $searchServiceInstance
+        
+        Write-Host -ForegroundColor Cyan "  Creating Analytics Processing Component..."
+        New-SPEnterpriseSearchAnalyticsProcessingComponent –SearchTopology $clone -SearchServiceInstance $searchServiceInstance 
+        
+        Write-Host -ForegroundColor Cyan "  Creating Crawl Component..."
+        New-SPEnterpriseSearchCrawlComponent –SearchTopology $clone -SearchServiceInstance $searchServiceInstance 
+        
+        Write-Host -ForegroundColor Cyan "  Creating Index Component..."
+        New-SPEnterpriseSearchIndexComponent –SearchTopology $clone -SearchServiceInstance $searchServiceInstance
+        
+        Write-Host -ForegroundColor Cyan "  Creating Query Component..."
+        New-SPEnterpriseSearchQueryProcessingComponent –SearchTopology $clone -SearchServiceInstance $searchServiceInstance
+        $clone.Activate()
+ 
+        Write-Host -ForegroundColor Cyan "  Setting Default Content Access Account..."
+        $contentAccess= New-Object Microsoft.Office.Server.Search.Administration.Content($searchApp) 
+        $contentAccess.SetDefaultGatheringAccount($crawlAcct, (ConvertTo-SecureString $crawlPass -AsPlainText -force)) 
+
+        Write-Host -ForegroundColor Cyan "  Setting Sharepoint Server Search Service Account..."
+        Set-SPEnterpriseSearchService -ServiceAccount $searchServAcct -ServicePassword (ConvertTo-SecureString $searchServPass -AsPlainText -force)
+    }
+    else{Write-Host -ForegroundColor Cyan "- $saName already exists. Continuing..."}
+}
+
+#Region App Management Service App
+function New-AppMGMT
+{
+    # Create the Application Management Service
+    $appname = "App Management Service"
+    $dbname = "AppManagement_DB"
+
+    # Create the App Management service and start its service instance
+    $sa = New-SPAppManagementServiceApplication -ApplicationPool $apppool -Name $appname -DatabaseName $dbname 
+    New-SPAppManagementServiceApplicationProxy -ServiceApplication $sa -Name "$appname Proxy"
+    Get-SPServiceInstance | Where-Object { $_.typename -eq "App Management Service" } | Start-SPServiceInstance
+
+    # Create the Subscription Settings service and start its service instance
+    $sa = New-SPSubscriptionSettingsServiceApplication -ApplicationPool $appPool -Name "Subscription Settings Service" -DatabaseName "Subscription_Settings_Service_DB"
+    New-SPSubscriptionSettingsServiceApplicationProxy -ServiceApplication $sa
+    Get-SPServiceInstance | where{$_.TypeName -eq "Microsoft SharePoint Foundation Subscription Settings Service"} | Start-SPServiceInstance
+}
 
 #Export Module Members
-Export-ModuleMember New-BCSApp,New-MMDataApp,New-UserProfileApp,New-StateServiceApp,New-UsageApp,New-SecureStoreApp,New-WebAnalyticsApp,New-VisioApp,New-PerfPointApp,New-AccessApp,New-ExcelApp,New-WordApp,New-EnterpriseSearchApp,Set-ManagedAcct
+Export-ModuleMember New-BCSApp,New-MMDataApp,New-UserProfileApp,New-StateServiceApp,New-UsageApp,New-SecureStoreApp,New-WebAnalyticsApp,New-VisioApp,New-PerfPointApp,New-2010AccessApp,New-2013AccessApp, New-ExcelApp,New-WordApp,New-2010EnterpriseSearchApp,New-2013EnterpriseSearchApp, Set-ManagedAcct

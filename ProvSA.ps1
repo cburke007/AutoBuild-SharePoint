@@ -10,6 +10,7 @@ Write-Host -ForegroundColor Yellow "Building Service Applications"
 $FarmConfigXML = [xml](get-content "$curloc\FarmConfig.xml" -EA 0)     
 $serviceApps = $FarmConfigXML.Customer.Farm.FarmServiceApplications.ServiceApp
 $DBPrefix = $FarmConfigXML.Customer.Farm.DBPrefix
+$buildVer = (Get-PSSnapin Microsoft.SharePoint.PowerShell).version.major
 
 foreach($serviceApp in $serviceApps)
 {	
@@ -79,8 +80,25 @@ foreach($serviceApp in $serviceApps)
 												}
 		"Access Services Application" 	{
 											$appPoolAcctName = $serviceApp.ServiceApplicationPoolAcctName
-											$acctNode = $FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Name='$appPoolAcctName']")												
-											New-AccessApp $serviceApp.DisplayName $serviceApp.ServiceApplicationPoolName $serviceApp.ServiceApplicationPoolAcctName $acctNode.Password								
+											$acctNode = $FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Name='$appPoolAcctName']")
+                                            $sqlAlias = $FarmConfigXML.Customer.Farm.FarmDBServerAlias											
+											$SQLVersion = Get-SQLVer $sqlAlias
+                                            
+                                            if($buildVer -eq "14")
+                                            {
+                                                New-2010AccessApp $serviceApp.DisplayName $serviceApp.ServiceApplicationPoolName $serviceApp.ServiceApplicationPoolAcctName $acctNode.Password
+                                            }
+                                            elseif($buildVer -eq "15")
+                                            {
+                                                if($SQLVersion -like "11*")
+                                                {
+                                                    New-2013AccessApp $serviceApp.DisplayName $serviceApp.ServiceApplicationPoolName $serviceApp.ServiceApplicationPoolAcctName $acctNode.Password
+                                                }
+                                                else
+                                                {
+                                                    New-2010AccessApp $serviceApp.DisplayName $serviceApp.ServiceApplicationPoolName $serviceApp.ServiceApplicationPoolAcctName $acctNode.Password
+                                                }
+                                            }
 										}
 		"Excel Services Application Web Service Application" 	{
 																	$appPoolAcctName = $serviceApp.ServiceApplicationPoolAcctName
@@ -98,18 +116,31 @@ foreach($serviceApp in $serviceApps)
 										$searchServer = Get-ServerNameByService $FarmConfigXML "SharePoint Server Search"
 										if($searchServer -eq $serverName)
 										{
-											if($FarmConfigXML.Customer.Farm.BuildVersion -like "14*")
+                                            $appPoolAcctName = $serviceApp.ServiceApplicationPoolAcctName
+											$acctNode=$FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Name='$appPoolAcctName']")
+											$prefixedDBName = $DBPrefix + $serviceApp.SearchAdminDatabase.DBName
+                                            
+                                            #Get Crawl Account Creds
+                                            $crawlAcctNode = $FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Type='Search Crawl']")
+                                            $crawlAcct = $crawlAcctNode.Name
+                                            $crawlPass = $crawlAcctNode.Password
+
+                                            #Get Search Service Creds
+                                            $searchAcctNode = $FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Type='Search Service']")
+                                            $searchServAcct = $searchAcctNode.Name
+                                            $searchServPass = $searchAcctNode.Password
+											    
+                                            if($buildVer -eq "14")
                                             {
-                                                $appPoolAcctName = $serviceApp.ServiceApplicationPoolAcctName
-											    $acctNode=$FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Name='$appPoolAcctName']")
-											    $prefixedDBName = $DBPrefix + $serviceApp.SearchAdminDatabase.DBName
-											    New-EnterpriseSearchApp $serviceApp.DisplayName $serviceApp.ServiceApplicationPoolName $serviceApp.SearchAdminDatabase.DBServer $prefixedDBName $serviceApp.ServiceApplicationPoolAcctName $acctNode.Password $searchServer										
+                                                New-2010EnterpriseSearchApp $serviceApp.DisplayName $serviceApp.ServiceApplicationPoolName $serviceApp.SearchAdminDatabase.DBServer $prefixedDBName $serviceApp.ServiceApplicationPoolAcctName $acctNode.Password $searchServer	$crawlAcct $crawlPass $searchServAcct $searchServPass								
 										    }
+                                            elseif($buildVer -eq "15")
+                                            {
+                                                New-2013EnterpriseSearchApp $serviceApp.DisplayName $serviceApp.ServiceApplicationPoolName $serviceApp.SearchAdminDatabase.DBServer $prefixedDBName $serviceApp.ServiceApplicationPoolAcctName $acctNode.Password $searchServer	$crawlAcct $crawlPass $searchServAcct $searchServPass							
+                                            }
+                                            
                                         }
-                                        elseif($FarmConfigXML.Customer.Farm.BuildVersion -like "15*")
-                                        {
-                                             Write-Host "Search Provisioning has not been implemented yet"
-                                        }
+                                        
 									}
 	}
 }	

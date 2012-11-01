@@ -20,11 +20,19 @@ Import-Module ./AutoBuild-Module -force
 # Get current script execution path
 [string]$curloc = get-location
 
+# Ensure necessary Windows Services are started
 $servicesToStart = "World Wide Web Publishing Service", "IIS Admin Service"
 
+# Make sure necessary windows services are started and set to Automatic
+foreach ($serviceToStart in $servicesToStart)
+{
+    Start-Service $serviceToStart
+}
+
+# Get the Farm Config XML file
 $FarmConfigXML = [xml](get-content "$curloc\FarmConfig.xml" -EA 0)
 
-# Create Farm Config XML
+# Create Farm Config XML if it does not exist
 if ($FarmConfigXML -eq $null)
 {
     ./SetVars.ps1    
@@ -44,13 +52,17 @@ else
 
     if($FarmConfigXML.Customer.Farm.Transformed -eq $null)
 	{
-		./ApplyTransforms.ps1
+		# If the Farm config is from an audit of another Farm it needs to be converted to match the new farm's topology
+        ./ApplyTransforms.ps1
 	}
 	
+    #Save the Farm Config
     $FarmConfigXML.Save("$curloc\FarmConfig.xml")
 }
+# Get a fresh copy of the Farm config XML file
 $FarmConfigXML = [xml](get-content "$curloc\FarmConfig.xml" -EA 0)
 
+#Get the Product Key from the Farm Config XML file and set the PID value in the config.cml in the root of the installation media
 $ProductKey = $FarmConfigXML.Customer.Farm.ProductKey
 $ConfigFile = "config.xml"
 $configxml = [xml](get-content "$curloc\$ConfigFile")
@@ -64,6 +76,7 @@ else
 	$PKeyNode.SetAttribute('Value',$ProductKey)
 }
 
+#Save the config.xml changes
 $configxml.Save("$curloc\$ConfigFile")
 
 # Set System PreReqs
@@ -73,16 +86,22 @@ $configxml.Save("$curloc\$ConfigFile")
 $serviceAcctLog = get-content "$curloc\ServiceAccounts.txt" -EA 0
 if($serviceAcctLog -eq $null)
 {
+    #Launch AD Account Creation Script
     ./CreateADAccounts.ps1 $FarmConfigXML
+
+    #Refresh the FarmConfigXML variable
     $FarmConfigXML = [xml](get-content "$curloc\FarmConfig.xml" -EA 0)
 
+    #Get Farm Admin Creds from XML
     $FarmAdminNode = $FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Type = 'Farm Admin']")
     $FarmAdmin = $FarmAdminNode.Name
     $FarmAdminPass = $FarmAdminNode.Password
 	
+    #Get Farm Connect Creds from XML
 	$FarmAcctNode = $FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Type = 'Farm Connect']")
 	$FarmAcct = $FarmAcctNode.Name
 	
+    #Get netbios for current domain
 	$netBios = (Get-LocalLogonInformation).DomainShortName
 	
 	# Get the DB Server Name
@@ -106,12 +125,6 @@ if($serviceAcctLog -eq $null)
 ./InstallSPBits.ps1
 # End Region
 
-# Make sure necessary windows services are started and set to Automatic
-foreach ($serviceToStart in $servicesToStart)
-{
-    Start-Service $serviceToStart
-}
-
 # Create or Join Existing Farm
 ./ConfigFarm.ps1
 
@@ -123,7 +136,7 @@ Initialize-SPResourceSecurity
 Write-Host -ForegroundColor Cyan " - Installing Services..."
 Install-SPService
 	
-# Get the Central Admin Server Name
+# Get the Central Admin Server Name from the FarmConfigXML
 $caServer = Get-ServerNameByService $FarmConfigXML "Central Administration"
 	
 $hostName = $env:COMPUTERNAME

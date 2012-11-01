@@ -133,6 +133,24 @@ Function Set-SQLAccess
 	}	
 	$SqlCmd.Connection.Close()
 }
+#EndRegion
+
+#Get SQL Version
+function Get-SQLVer
+{
+    param([string]$svrName)
+
+    $dt = new-object "System.Data.DataTable"
+    $cn = new-object System.Data.SqlClient.SqlConnection "server=$svrName;database=master;Integrated Security=sspi"
+    $cn.Open()
+    $sql = $cn.CreateCommand()
+    $sql.CommandText = "SELECT SERVERPROPERTY('ProductVersion') AS Version"
+    $rdr = $sql.ExecuteReader()
+    $dt.Load($rdr)
+    $cn.Close()
+    return $dt.Version
+}
+#EndRegion
 
 function Get-ServerNameByService
 {
@@ -242,4 +260,4 @@ function New-ADUser
 #EndRegion Global Functions
 
 #Export Module Members
-Export-ModuleMember Suspend-Script, Get-LocalLogonInformation, Start-Service, Get-RandomPassword, Get-RandomText, Get-ComplexPassword, Set-SQLAccess, New-ADUser, Get-ServerNameByService
+Export-ModuleMember Suspend-Script, Get-LocalLogonInformation, Start-Service, Get-RandomPassword, Get-RandomText, Get-ComplexPassword, Set-SQLAccess, New-ADUser, Get-ServerNameByService, Get-SQLVer

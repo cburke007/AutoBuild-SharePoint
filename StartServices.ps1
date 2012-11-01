@@ -47,6 +47,8 @@ foreach($serviceNode in $servicesNode.Service)
 		"Word Automation Services" {if($serviceNode.Status -eq "Online"){Start-Service $serviceNode.Name}}
 		
 		"Search Query and Site Settings Service" {if($serviceNode.Status -eq "Online"){Start-Service $serviceNode.Name}}
+        
+        "Machine Translation Service" {if($serviceNode.Status -eq "Online"){Start-Service $serviceNode.Name}}
 	}
 }	  
 #EndRegion
