@@ -1,5 +1,8 @@
 ﻿Import-Module ./AutoBuild-Module
 
+# Get current script execution path
+[string]$curloc = get-location
+
 # Get the path to the SharePoint bits root path
 $bits = Get-Item $curloc | Split-Path -Parent
 
