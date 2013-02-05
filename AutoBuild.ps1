@@ -11,14 +11,18 @@
 #* Keywords:
 #*=============================================
 #* Purpose: Master Control script for controlling
-#* the installation of SharePoint 2010
+#* the installation of SharePoint 2010 and 2013
 #*
 #*============================================= 
 
 Import-Module ./AutoBuild-Module -force
+Import-Module ServerManager
 
 # Get current script execution path
 [string]$curloc = get-location
+
+# Check that pre-requisite Roles have been installed into Windows
+Add-WindowsFeature "Web-Default-Doc", "Web-Dir-Browsing", "Web-Dir-Browsing", "Web-Static-Content", "Web-Http-Redirect", "Web-Http-Logging", "Web-Log-Libraries", "Web-Request-Monitor", "Web-Http-Tracing", "Web-Stat-Compression", "Web-Dyn-Compression", "Web-Filtering", "Web-Basic-Auth", "Web-Client-Auth", "Web-Digest-Auth", "Web-Cert-Auth", "Web-IP-Security", "Web-Url-Auth", "Web-Windows-Auth", "Web-Asp-Net", "Web-ISAPI-Ext", "Web-ISAPI-Filter", "Web-Net-Ext", "Web-Mgmt-Console", "Web-Metabase", "Web-Lgcy-Scripting", "Web-WMI", "Web-Scripting-Tools", "SMTP-Server", "PowerShell-ISE"
 
 # Ensure necessary Windows Services are started
 $servicesToStart = "World Wide Web Publishing Service", "IIS Admin Service"
