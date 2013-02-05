@@ -1,4 +1,6 @@
-﻿#Region HealthRules
+﻿Import-Module ./AutoBuild-Module
+
+#Region HealthRules
 function Disable2010HealthRule
 {
 	param([string]$title)
@@ -45,3 +47,10 @@ ElseIf((Get-PSSnapin Microsoft.SharePoint.PowerShell).version.major -eq "15")
 {
 
 }
+
+# Copy SharePoint Tools folder to C:\rs-pkgs
+# Get current script execution path
+[string]$curloc = get-location
+# Get the path to the SharePoint bits root path
+$bits = Get-Item $curloc | Split-Path -Parent
+Copy-Item "$bits\Sharepoint Tools" "C:\rs-pkgs\Sharepoint Tools" -recurse
