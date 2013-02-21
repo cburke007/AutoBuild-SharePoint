@@ -344,12 +344,15 @@ function New-UsageApp
 	{		
 		If ((Get-SPServiceApplication | ?{$_.Name -eq $saName}) -eq $null)
 		{
-			Write-Host -ForegroundColor Cyan "- Creating $saName..."
-			$usageServiceInstance = Get-SPUsageService
-            New-SPUsageApplication -Name $saName -DatabaseServer $dbServer -DatabaseName $dbName -UsageService $usageServiceInstance
+		    Write-Host -ForegroundColor Cyan "- Creating $saName..."
+            New-SPUsageApplication -Name $saName -DatabaseServer $dbServer -DatabaseName $dbName | Out-Null
             $up = get-spserviceapplicationproxy | where {$_.DisplayName -eq "$saName"}
             $up.provision()
 			Write-Host -ForegroundColor Cyan "- Done Creating $saName..."
+            Write-Host -ForegroundColor White " - Enabling usage processing timer job..."
+            $usageProcessingJob = Get-SPTimerJob | ? {$_.TypeName -eq "Microsoft.SharePoint.Administration.SPUsageProcessingJobDefinition"}
+            $usageProcessingJob.IsDisabled = $false
+            $usageProcessingJob.Update()            
 		}
 		Else {Write-Host -ForegroundColor Cyan "- $saName exists, continuing..."}
 	}
