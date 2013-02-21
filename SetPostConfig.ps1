@@ -45,7 +45,21 @@ If((Get-PSSnapin Microsoft.SharePoint.PowerShell).version.major -eq "14")
 }
 ElseIf((Get-PSSnapin Microsoft.SharePoint.PowerShell).version.major -eq "15")
 {
-
+    # Configure your app domain and location 
+    # assumes path of app.contoso-apps.com 
+    # http://msdn.microsoft.com/en-us/library/fp179923(v=office.15).aspx
+    $FarmConfigXML = [xml](get-content "$curloc\FarmConfig.xml" -EA 0)     
+    $AppDomain = $FarmConfigXML.Customer.Farm.AppDomain
+    $AppPrefix = $FarmConfigXML.Customer.Farm.AppPrefix
+    if($AppDomain)
+    {
+        Set-spappdomain -appdomain $AppDomain -Confirm:$false
+    }
+    
+    if($AppPrefix)
+    {
+        Set-spappSiteSubscriptionName -Name $AppPrefix -Confirm:$false
+    }
 }
 
 # Copy SharePoint Tools folder to C:\rs-pkgs
@@ -53,4 +67,7 @@ ElseIf((Get-PSSnapin Microsoft.SharePoint.PowerShell).version.major -eq "15")
 [string]$curloc = get-location
 # Get the path to the SharePoint bits root path
 $bits = Get-Item $curloc | Split-Path -Parent
-Copy-Item "$bits\Sharepoint Tools" "C:\rs-pkgs\Sharepoint Tools" -recurse
+if(-not (Get-Item "C:\rs-pkgs\SharePoint Tools" -EA SilentlyContinue))
+{
+    Copy-Item "$bits\Sharepoint Tools" "C:\rs-pkgs\Sharepoint Tools" -recurse
+}

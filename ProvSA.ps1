@@ -23,7 +23,21 @@ foreach($serviceApp in $serviceApps)
 																New-BCSApp $serviceApp.DisplayName $serviceApp.ServiceApplicationPoolName $serviceApp.Database.DBServer $prefixedDBName $serviceApp.ServiceApplicationPoolAcctName $acctNode.Password
 															}
 															
-		"Managed Metadata Service" 		{
+		"App Management Service Application" 	{						
+																$appPoolAcctName = $serviceApp.ServiceApplicationPoolAcctName
+																$acctNode=$FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Name='$appPoolAcctName']")
+																$prefixedDBName = $DBPrefix + $serviceApp.Database.DBName
+																New-AppMgmtApp $serviceApp.DisplayName $serviceApp.ServiceApplicationPoolName $serviceApp.Database.DBServer $prefixedDBName $serviceApp.ServiceApplicationPoolAcctName $acctNode.Password
+															}
+
+        "Microsoft SharePoint Foundation Subscription Settings Service Application" 	{						
+																$appPoolAcctName = $serviceApp.ServiceApplicationPoolAcctName
+																$acctNode=$FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Name='$appPoolAcctName']")
+																$prefixedDBName = $DBPrefix + $serviceApp.Database.DBName
+																New-SubscrApp $serviceApp.DisplayName $serviceApp.ServiceApplicationPoolName $serviceApp.Database.DBServer $prefixedDBName $serviceApp.ServiceApplicationPoolAcctName $acctNode.Password
+															}
+
+        "Managed Metadata Service" 		{
 											$appPoolAcctName = $serviceApp.ServiceApplicationPoolAcctName
 											$acctNode = $FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Name='$appPoolAcctName']")
 											$farmAcctNode = $FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Type='Farm Connect']")

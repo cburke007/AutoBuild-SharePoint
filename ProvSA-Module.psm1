@@ -102,6 +102,62 @@ function New-BCSApp
 }
 #EndRegion
 
+#Region Create App Management Service App
+function New-AppMgmtApp
+{
+    param([string]$saName, [string]$appPoolName, [string]$dbServer, [string]$dbName, [string]$saAppPoolUser, [string]$saAppPoolPass)
+		
+	if((Get-SPServiceApplication | ?{$_.Name -eq $saName}) -eq $null)
+	{	
+		$netbios = (Get-LocalLogonInformation).DomainShortName	
+		$domSAAppPoolUser ="$netbios\$saAppPoolUser" 
+		#Check/Create Managed Account
+		Set-ManagedAcct $domSAAppPoolUser $saAppPoolPass
+		#Create SA AppPool
+		$saAppPool = CreateSAAppPool $appPoolName $domSAAppPoolUser
+	
+        ## Create Service App
+   		Write-Host -ForegroundColor Cyan "Creating App Management Service App and Proxy..."
+        $AppMgmtServiceApp = New-SPAppManagementServiceApplication -Name $saName -ApplicationPool $saAppPool -DatabaseServer $dbServer -DatabaseName "$dbName"
+        If (-not $?) { throw "- Failed to create $saName" }
+
+        ## create proxy
+		Write-Host -ForegroundColor Cyan " - Creating Metadata Service Application Proxy..."
+        $AppMgmtServiceAppProxy  = New-SPAppManagementServiceApplicationProxy  -Name "$saName Proxy" -ServiceApplication $AppMgmtServiceApp
+        If (-not $?) { throw "- Failed to create $saName" }
+    }
+	else{Write-Host -ForegroundColor Cyan "- $saName already exists. Continuing..."}	
+}
+#EndRegion
+
+#Region Create Subscription Service App
+function New-SubscrApp
+{
+    param([string]$saName, [string]$appPoolName, [string]$dbServer, [string]$dbName, [string]$saAppPoolUser, [string]$saAppPoolPass)
+		
+	if((Get-SPServiceApplication | ?{$_.Name -eq $saName}) -eq $null)
+	{	
+		$netbios = (Get-LocalLogonInformation).DomainShortName	
+		$domSAAppPoolUser ="$netbios\$saAppPoolUser" 
+		#Check/Create Managed Account
+		Set-ManagedAcct $domSAAppPoolUser $saAppPoolPass
+		#Create SA AppPool
+		$saAppPool = CreateSAAppPool $appPoolName $domSAAppPoolUser
+	
+        ## Create Service App
+   		Write-Host -ForegroundColor Cyan "Creating Subscription Service App and Proxy..."
+        $SubscrServiceApp = New-SPSubscriptionSettingsServiceApplication -Name $saName -ApplicationPool $saAppPool -DatabaseServer $dbServer -DatabaseName "$dbName"
+        If (-not $?) { throw "- Failed to create $saName" }
+
+        ## create proxy
+		Write-Host -ForegroundColor Cyan " - Creating Metadata Service Application Proxy..."
+        $SubscrServiceAppProxy  = New-SPSubscriptionSettingsServiceApplicationProxy -ServiceApplication $SubscrServiceApp
+        If (-not $?) { throw "- Failed to create $saName" }
+    }
+	else{Write-Host -ForegroundColor Cyan "- $saName already exists. Continuing..."}	
+}
+#EndRegion
+
 #Region Create Metadata Service Application
 function New-MMDataApp
 {		
@@ -184,8 +240,7 @@ function New-UserProfileApp
 						
 			## Create Service App
 			Write-Host -ForegroundColor Cyan " - Creating $saName..."
-            #$ProfileServiceApp  = New-SPProfileServiceApplication -Name "$saName" -ApplicationPool $saAppPool -ProfileDBName $ProfileDB -ProfileSyncDBName $SyncDB -SocialDBName $SocialDB -SyncInstanceMachine $env:COMPUTERNAME -MySiteHostLocation "$MySiteURL`:$MySitePort"
-           	$ProfileServiceApp  = New-SPProfileServiceApplication -Name "$saName" -ApplicationPool $saAppPool -ProfileDBServer $ProfileDBServer -ProfileDBName $ProfileDB -ProfileSyncDBServer $SyncDBServer -ProfileSyncDBName $SyncDB -SocialDBServer $SocialDBServer -SocialDBName $SocialDB
+            $ProfileServiceApp  = New-SPProfileServiceApplication -Name "$saName" -ApplicationPool $saAppPool -ProfileDBServer $ProfileDBServer -ProfileDBName $ProfileDB -ProfileSyncDBServer $SyncDBServer -ProfileSyncDBName $SyncDB -SocialDBServer $SocialDBServer -SocialDBName $SocialDB
            	If (-not $?) { throw " - Failed to create $saName" }
                     
             ## Create Proxy
@@ -221,12 +276,11 @@ function New-UserProfileApp
 			$ProfileServiceApp = Get-SPServiceApplication |?{$_.Name -eq $saName}
 			If ($ProfileServiceApp)
 			{
-				Write-Host -ForegroundColor Cyan "- Fixing SQL ownership for profile database: $DBServer\$ProfileDB..."
+				Write-Host -ForegroundColor Cyan "- Fixing SQL ownership for Sync database: $DBServer\$SyncDB..."
   		        $sqlCmd = New-Object System.Data.SqlClient.SqlCommand
             	$sqlCmd.CommandType = "Text"
-            	#$sqlCmd.CommandText = "ALTER USER [$domFarmAcct]  WITH DEFAULT_SCHEMA=dbo;"
 				$SqlCmd.CommandText = "exec sp_dropuser `'$domFarmAcct`'; exec sp_changedbowner `'$domFarmAcct`';"
-            	$connString = "Integrated Security=SSPI;Persist Security Info=False;Data Source=$dbServer;Initial Catalog=$ProfileDB;"
+            	$connString = "Integrated Security=SSPI;Persist Security Info=False;Data Source=$dbServer;Initial Catalog=$SyncDB;"
             	$connection = New-Object System.Data.SqlClient.SqlConnection($connString)
             	try 
 				{
@@ -291,10 +345,11 @@ function New-UsageApp
 		If ((Get-SPServiceApplication | ?{$_.Name -eq $saName}) -eq $null)
 		{
 			Write-Host -ForegroundColor Cyan "- Creating $saName..."
-			New-SPUsageApplication -Name $saName -DatabaseServer $dbServer -DatabaseName $dbName > $null
+			$usageServiceInstance = Get-SPUsageService
+            New-SPUsageApplication -Name $saName -DatabaseServer $dbServer -DatabaseName $dbName -UsageService $usageServiceInstance
             $up = get-spserviceapplicationproxy | where {$_.DisplayName -eq "$saName"}
             $up.provision()
-			Write-Host -ForegroundColor Cyan "- Done Creating WSS Usage Application."
+			Write-Host -ForegroundColor Cyan "- Done Creating $saName..."
 		}
 		Else {Write-Host -ForegroundColor Cyan "- $saName exists, continuing..."}
 	}
@@ -671,4 +726,4 @@ function New-AppMGMT
 }
 
 #Export Module Members
-Export-ModuleMember New-BCSApp,New-MMDataApp,New-UserProfileApp,New-StateServiceApp,New-UsageApp,New-SecureStoreApp,New-WebAnalyticsApp,New-VisioApp,New-PerfPointApp,New-2010AccessApp,New-2013AccessApp, New-ExcelApp,New-WordApp,New-2010EnterpriseSearchApp,New-2013EnterpriseSearchApp, Set-ManagedAcct
+Export-ModuleMember New-BCSApp,New-MMDataApp,New-UserProfileApp,New-StateServiceApp,New-UsageApp,New-SecureStoreApp,New-WebAnalyticsApp,New-VisioApp,New-PerfPointApp,New-2010AccessApp,New-2013AccessApp, New-ExcelApp,New-WordApp,New-2010EnterpriseSearchApp,New-2013EnterpriseSearchApp, Set-ManagedAcct, New-AppMgmtApp, New-SubscrApp

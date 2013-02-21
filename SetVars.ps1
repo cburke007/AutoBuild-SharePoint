@@ -17,7 +17,22 @@
     '
 
 #Choose the edition of SharePoint you are installing
-Write-Host -ForegroundColor Cyan "Choose your version (Default == Foundation)"
+Write-Host -ForegroundColor Yellow "Choose your Version (Default == SharePoint 2010)"
+Write-Host -ForegroundColor Cyan "1. SharePoint 2010"
+Write-Host -ForegroundColor Cyan "2. SharePoint 2013"
+Write-Host -ForegroundColor Cyan " "
+$VerChoice = Read-Host "Select 1-2: "
+
+switch($VerChoice)
+{
+    1 {$Version = "SP2010"}
+    2 {$Version = "SP2013"}
+    default {$Version = "SP2010"}
+}
+Write-Host ""
+
+#Choose the edition of SharePoint you are installing
+Write-Host -ForegroundColor Yellow "Choose your Edition (Default == Foundation)"
 Write-Host -ForegroundColor Cyan "1. Foundation"
 Write-Host -ForegroundColor Cyan "2. SearchServer"
 Write-Host -ForegroundColor Cyan "3. Standard"
@@ -37,6 +52,7 @@ switch($EdChoice)
     6 {$Edition = "Enterprise Internet"}
     default {$Edition = "Foundation"}
 }
+Write-Host ""
 
 $FarmConfigXML.Customer.Farm.SetAttribute("LicenseLevel", $Edition)
 
@@ -51,6 +67,15 @@ if([string]::IsNullOrEmpty($FarmPass))
 	$FarmPass = "R@ckSp@ce!sK!ng"
 }
 $FarmConfigXML.Customer.Farm.SetAttribute("Passphrase", $FarmPass)
+
+if($Version -eq "SP2013")
+{
+    $AppDomain = Read-Host "What is the App Domain? (Leave blank if unknown...)"
+    $FarmConfigXML.Customer.Farm.SetAttribute("AppDomain", $AppDomain)
+
+    $AppPrefix = Read-Host "What is the App Prefix? (Leave blank if unknown...)"
+    $FarmConfigXML.Customer.Farm.SetAttribute("AppPrefix", $AppPrefix)
+}
 
 # Populate Server/Service Architecture
 $numServers = Read-Host "How many servers are in this Farm? "
@@ -86,7 +111,7 @@ for($i=1; $i -le $numServers; $i++)
     Do
     {
         #Choose the edition of SharePoint 2010 you are installing
-        Write-Host -ForegroundColor Cyan "Choose a Role for server $serverName "
+        Write-Host -ForegroundColor Yellow "Choose a Role for server $serverName "
         Write-Host -ForegroundColor Cyan "1. Web Front-End"
         Write-Host -ForegroundColor Cyan "2. Central Administration"
         Write-Host -ForegroundColor Cyan "3. Application Server"
@@ -127,7 +152,15 @@ for($i=1; $i -le $numServers; $i++)
                     $newServiceNode.SetAttribute("Name","Central Administration")
                     $newServiceNode.SetAttribute("Status","Online")
                     $servicesNode.AppendChild($newServiceNode)
-                    
+
+                    if ($EdChoice -ge 3)
+                    {
+                        # Create a new Server Service Element and populate it with Name and Status
+                        $newServiceNode = $FarmConfigXML.CreateElement("Service")
+                        $newServiceNode.SetAttribute("Name","User Profile Synchronization Service")
+                        $newServiceNode.SetAttribute("Status","Online")
+                        $servicesNode.AppendChild($newServiceNode)
+                    }
             
               }
             3 {
@@ -139,7 +172,22 @@ for($i=1; $i -le $numServers; $i++)
                     $newServiceNode.SetAttribute("Status","Online")
                     $servicesNode.AppendChild($newServiceNode)
                     
-                    
+                    if($Version -eq "SP2013")
+                    {
+                        # Create a new Server Service Element and populate it with Name and Status
+                        $newServiceNode = $FarmConfigXML.CreateElement("Service")
+                        $newServiceNode.SetAttribute("Name","App Management Service")
+                        $newServiceNode.SetAttribute("Status","Online")
+                        $servicesNode.AppendChild($newServiceNode)
+
+                        # Create a new Server Service Element and populate it with Name and Status
+                        $newServiceNode = $FarmConfigXML.CreateElement("Service")
+                        $newServiceNode.SetAttribute("Name","Microsoft SharePoint Foundation Subscription Settings Service")
+                        $newServiceNode.SetAttribute("Status","Online")
+                        $servicesNode.AppendChild($newServiceNode)
+
+                    }
+
                     if ($EdChoice -ge 3)
                     {
                         # Create a new Server Service Element and populate it with Name and Status
@@ -437,7 +485,20 @@ if($FarmConfigXML.Customer.Farm.UseCustomAccounts -eq "Y" -or $FarmConfigXML.Cus
         $BCSAppPool = $AcctPrefix + $BCSAppPool
         if(UserExists $BCSAppPool){$pass = Read-Host "User $BCSAppPool Exists! Please enter existing Password ";ServiceAcctElement $BCSAppPool "BCS AppPool" $pass}
         else{ServiceAcctElement $BCSAppPool "BCS AppPool"}
-            
+        
+        if($Version -eq "SP2013")
+        {
+            $AppMgmtAppPool = Read-Host "What is the App Mgmt App Pool Account? "
+            $AppMgmtAppPool = $AcctPrefix + $AppMgmtAppPool
+            if(UserExists $AppMgmtAppPool){$pass = Read-Host "User $AppMgmtAppPool Exists! Please enter existing Password ";ServiceAcctElement $AppMgmtAppPool "AppMgmt AppPool" $pass}
+            else{ServiceAcctElement $AppMgmtAppPool "AppMgmt AppPool"}
+        
+            $SubscrAppPool = Read-Host "What is the Subscription Settings App Pool Account? "
+            $SubscrAppPool = $AcctPrefix + $SubscrAppPool
+            if(UserExists $SubscrAppPool){$pass = Read-Host "User $SubscrAppPool Exists! Please enter existing Password ";ServiceAcctElement $SubscrAppPool "Subscriptions AppPool" $pass}
+            else{ServiceAcctElement $SubscrAppPool "Subscriptions AppPool"}
+        
+        }    
         
         if($FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard Internet" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise Internet")
         {
@@ -567,7 +628,17 @@ else
         if(UserExists $BCSAppPool){$pass = Read-Host "User $BCSAppPool Exists! Please enter existing Password ";ServiceAcctElement $BCSAppPool "BCS AppPool" $pass}
         else{ServiceAcctElement $BCSAppPool "BCS AppPool"}
         
+        if($Version -eq "SP2013")
+        {
+            $AppMgmtAppPool = $AcctPrefix + "SP_AppMgmt_AP"
+            if(UserExists $AppMgmtAppPool){$pass = Read-Host "User $AppMgmtAppPool Exists! Please enter existing Password ";ServiceAcctElement $AppMgmtAppPool "AppMgmt AppPool" $pass}
+            else{ServiceAcctElement $AppMgmtAppPool "AppMgmt AppPool"}
         
+            $SubscrAppPool = $AcctPrefix + "SP_Subscr_AP"
+            if(UserExists $SubscrAppPool){$pass = Read-Host "User $SubscrAppPool Exists! Please enter existing Password ";ServiceAcctElement $SubscrAppPool "Subscriptions AppPool" $pass}
+            else{ServiceAcctElement $SubscrAppPool "Subscriptions AppPool"}
+        }
+
         if($FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard Internet" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise Internet")
         {
             $UsageServ = $AcctPrefix + "SP_Usage_AP"
@@ -858,6 +929,25 @@ $appPoolAcct = GetAPAcctName "BCS AppPool" $defSAAppPoolAcctName
 $appPoolName = GetAppPoolName "$appPoolAcct" "BCS Web Services" $defSAAppPoolAcctName
 # Add the Service App Node to the Farm Config XML. Provide $custServiceApps, Service App Name, Service App Type, Database Name, DB Server, $appPoolName, $appPoolAcct, Partitioning, Proxy Group
 AddServiceAppNode "$custServiceApps" "Business Data Connectivity Services" "Business Data Connectivity Service Application" "BCSDB" "$dbServer" "$appPoolName" "$appPoolAcct" "UnPartitioned" "[default]"
+
+if($Version -eq "SP2013")
+{
+    # Build App Management Service App variables
+    # Get the App Pool Account from XML. Provide the Account Type and the Default SA AppPool Account Name
+    $appPoolAcct = GetAPAcctName "AppMgmt AppPool" $defSAAppPoolAcctName
+    # Get the App Pool Name. Provide the AppPool Account, the Standard Custom App Pool Name, and the Default SA AppPool Account Name
+    $appPoolName = GetAppPoolName "$appPoolAcct" "AppMgmt Web Services" $defSAAppPoolAcctName
+    # Add the Service App Node to the Farm Config XML. Provide $custServiceApps, Service App Name, Service App Type, Database Name, DB Server, $appPoolName, $appPoolAcct, Partitioning, Proxy Group
+    AddServiceAppNode "$custServiceApps" "Application Management Services" "App Management Service Application" "App_Management_DB" "$dbServer" "$appPoolName" "$appPoolAcct" "UnPartitioned" "[default]"
+
+    # Build Subscription Settings Service App variables
+    # Get the App Pool Account from XML. Provide the Account Type and the Default SA AppPool Account Name
+    $appPoolAcct = GetAPAcctName "Subscriptions AppPool" $defSAAppPoolAcctName
+    # Get the App Pool Name. Provide the AppPool Account, the Standard Custom App Pool Name, and the Default SA AppPool Account Name
+    $appPoolName = GetAppPoolName "$appPoolAcct" "Subscriptions Web Services" $defSAAppPoolAcctName
+    # Add the Service App Node to the Farm Config XML. Provide $custServiceApps, Service App Name, Service App Type, Database Name, DB Server, $appPoolName, $appPoolAcct, Partitioning, Proxy Group
+    AddServiceAppNode "$custServiceApps" "Subscription Settings Services" "Microsoft SharePoint Foundation Subscription Settings Service Application" "Subscription_DB" "$dbServer" "$appPoolName" "$appPoolAcct" "UnPartitioned" "[default]"
+}
 
 # Generate Search Server Service App Config
 if($FarmConfigXML.Customer.Farm.LicenseLevel -eq "Search Server" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Standard Internet" -or $FarmConfigXML.Customer.Farm.LicenseLevel -eq "Enterprise Internet")

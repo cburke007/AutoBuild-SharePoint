@@ -21,9 +21,12 @@ Import-Module ServerManager
 # Get current script execution path
 [string]$curloc = get-location
 
+Write-Host -Foreground Yellow "Checking Server Role Pre-Requisites..." 
 # Check that pre-requisite Roles have been installed into Windows
 Add-WindowsFeature "Web-Default-Doc", "Web-Dir-Browsing", "Web-Dir-Browsing", "Web-Static-Content", "Web-Http-Redirect", "Web-Http-Logging", "Web-Log-Libraries", "Web-Request-Monitor", "Web-Http-Tracing", "Web-Stat-Compression", "Web-Dyn-Compression", "Web-Filtering", "Web-Basic-Auth", "Web-Client-Auth", "Web-Digest-Auth", "Web-Cert-Auth", "Web-IP-Security", "Web-Url-Auth", "Web-Windows-Auth", "Web-Asp-Net", "Web-ISAPI-Ext", "Web-ISAPI-Filter", "Web-Net-Ext", "Web-Mgmt-Console", "Web-Metabase", "Web-Lgcy-Scripting", "Web-WMI", "Web-Scripting-Tools", "SMTP-Server", "PowerShell-ISE"
+Write-Host ""
 
+Write-Host -Foreground Yellow "Checking Status of Windows Services Pre-Requisites..."
 # Ensure necessary Windows Services are started
 $servicesToStart = "World Wide Web Publishing Service", "IIS Admin Service"
 
@@ -32,6 +35,7 @@ foreach ($serviceToStart in $servicesToStart)
 {
     Start-Service $serviceToStart
 }
+Write-Host ""
 
 # Get the Farm Config XML file
 $FarmConfigXML = [xml](get-content "$curloc\FarmConfig.xml" -EA 0)
@@ -159,6 +163,9 @@ if($caServer -eq $hostName)
 
 #Provision Service Applications
 ./ProvSA.ps1
+
+#Re-run the start services script to start any SharePoint Services for the current server that have to be started AFTER the Service App is provisioned
+./StartServices.ps1
 
 # Provision Web Applications
 ./ProvWebApps.ps1

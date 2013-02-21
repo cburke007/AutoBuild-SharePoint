@@ -29,9 +29,14 @@ function Start-Service
 #Region Start User Profile Synch Service
 function Start-UPSynchService
 {
-	## Start User Profile Synchronization Service
+	param([string]$saName, [string]$farmAcct, [string]$farmPass)
+
+    $netbios = (Get-LocalLogonInformation).DomainShortName	
+	$domFarmAcct = "$netbios\$farmAcct"
+
+    ## Start User Profile Synchronization Service
 	## Get User Profile Service
-	$ProfileServiceApp = Get-SPServiceApplication |?{$_.Name -eq $userProfileSAName}
+	$ProfileServiceApp = Get-SPServiceApplication |?{$_.Name -eq $saName}
 	If ($ProfileServiceApp)
 	{
 		## Get User Profile Synchronization Service
@@ -41,10 +46,9 @@ function Start-UPSynchService
 		{    				
 			Write-Host -ForegroundColor Cyan "`n"
 			Write-Host -ForegroundColor Cyan " - Starting User Profile Synchronization Service..." -NoNewline
-			$ProfileServiceApp.SetSynchronizationMachine($env:COMPUTERNAME, $ProfileSyncService.Id, $domFarmAcct, $txtFarmAcctPWD)
-			#If ($ProfileSyncService.Status -eq "Provisioning") {Write-Host -ForegroundColor Cyan " - Waiting for User Profile Service Synchronization Service to start provisioning..." -NoNewline}
-			#ElseIf 
-			If (($ProfileSyncService.Status -ne "Provisioning") -and ($ProfileSyncService.Status -ne "Online")) {Write-Host -ForegroundColor Cyan " - Waiting for User Profile Synchronization Service to be started..." -NoNewline}
+			$ProfileServiceApp.SetSynchronizationMachine($env:COMPUTERNAME, $ProfileSyncService.Id, $domFarmAcct, $farmPass)
+			
+            If (($ProfileSyncService.Status -ne "Provisioning") -and ($ProfileSyncService.Status -ne "Online")) {Write-Host -ForegroundColor Cyan " - Waiting for User Profile Synchronization Service to be started..." -NoNewline}
 			Else ## Monitor User Profile Sync service status
 			{
 			While ($ProfileSyncService.Status -ne "Online")

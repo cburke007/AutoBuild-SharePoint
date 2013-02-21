@@ -7,7 +7,7 @@
     <Setting Id="OFFICESERVERPREMIUM" Value="1" />
   </Package>
   <Logging Type="verbose" Path="%temp%" Template="SharePoint Server Setup(*).log" />
-  <PIDKEY Value="6RNT8-XV26M-GWH36-VMGQH-94MMH" />
+  <PIDKEY Value="P4GN7-G2J3K-XPQYT-XG4j4-F6WFV" />
   <Display Level="none" CompletionNotice="No" />
   <Setting Id="SERVERROLE" Value="APPLICATION" />
   <Setting Id="USINGUIINSTALLMODE" Value="0" />

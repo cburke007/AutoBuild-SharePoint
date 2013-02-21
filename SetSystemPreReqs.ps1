@@ -40,12 +40,13 @@ If (-not ($MoMPathValue.ManagedSharepoint -eq "1"))
 
 # Create SQL Alias
 $dbServer = $FarmConfigXML.Customer.Farm.FarmDBServer
+$SQLAlias = $FarmConfigXML.Customer.Farm.FarmDBServerAlias
 $LsaPath = "HKLM:\SOFTWARE\Microsoft\MSSQLServer\Client\ConnectTo"
 if (-not (Test-Path $LsaPath)){md $LsaPath > $null}
 $LsaPathValue = Get-ItemProperty -path $LsaPath
-If ($LsaPathValue.SharePointSQL -eq $null)
+If ($LsaPathValue.$SQLAlias -eq $null)
 {
-    New-ItemProperty $LsaPath -Name "SharePointSQL" -value "DBMSSOCN,$dbServer" -PropertyType String -Force | Out-Null
+    New-ItemProperty $LsaPath -Name "$SQLAlias" -value "DBMSSOCN,$dbServer" -PropertyType String -Force | Out-Null
 }
 
 $FarmAcctNode = $FarmConfigXML.selectSingleNode("//Customer/Farm/FarmAccounts/Account[@Type = 'Farm Connect']")
