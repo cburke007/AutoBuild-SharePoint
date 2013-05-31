@@ -221,14 +221,9 @@ $env:AutoSPPath = $bits + "\AutoSPInstaller"
 
 $netbios = (Get-LocalLogonInformation).DomainShortName
 
-# Open/Create the Users.txt file    
-$text = "$env:dp0\ServiceAccounts.txt"
-#Get Current Date
-$date = Get-Date
+$text = "$env:dp0\COREInfo.txt"
 
-#Initiate the Service Account Creation Log
-"Service Account Creation Log - $date" | out-file "$text"
- "" | out-file "$text" -append
+"<b>Sharepoint Credentials:</b>" | out-file "$text" -Append
 
 $AutoSPXML = [xml](get-content "$env:AutoSPPath\AutoSPInstallerInput.xml" -EA 0)
 
@@ -371,6 +366,14 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Enterprise")
     $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.UnattendedIDUser = $netbios + "\" + $PerfPointUser
     $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.UnattendedIDPassword = $pass
 }
+
+# Complete CORE AD logging file
+"" | out-file "$text" -Append
+"<b>Site URLs:</b> " | out-file "$text" -Append
+"" | out-file "$text" -Append
+"Content Database Names: " | out-file "$text" -Append
+"SSRS Integration? " | out-file "$text" -Append
+"<b>Sharepoint Products/Add-ons installed:</b> " | out-file "$text" -Append
 
 $AutoSPXML.Save("$env:AutoSPPath\AutoSPInstallerInput.xml")
 

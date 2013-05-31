@@ -15,6 +15,7 @@
 #* via AutoSPInstaller
 #*============================================= 
 
+
 # Get current script execution path and the parent path
 $0 = $myInvocation.MyCommand.Definition
 $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
@@ -27,6 +28,8 @@ $AutoSPXML = [xml](get-content "$env:AutoSPPath\AutoSPInstallerInput.xml" -EA 0)
 # Create Service Account Config XML if it does not exist and populate Service Accounts
 if ($AutoSPXML -eq $null)
 {
+    
+    
     ./RS_AutoBuildSetVars.ps1
     
     # Get a fresh copy of the AutoSPInstaller Config XML file

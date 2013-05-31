@@ -1,3 +1,35 @@
+#Function Get NetBios Name for current AD
+function Get-LocalLogonInformation
+{
+    try
+    {
+
+        $ADSystemInfo = New-Object -ComObject ADSystemInfo
+
+        $type = $ADSystemInfo.GetType()
+
+        New-Object -TypeName PSObject -Property @{
+
+            UserDistinguishedName = $type.InvokeMember('UserName','GetProperty',$null,$ADSystemInfo,$null)
+            ComputerDistinguishedName = $type.InvokeMember('ComputerName','GetProperty',$null,$ADSystemInfo,$null)
+            SiteName = $type.InvokeMember('SiteName','GetProperty',$null,$ADSystemInfo,$null)
+            DomainShortName = $type.InvokeMember('DomainShortName','GetProperty',$null,$ADSystemInfo,$null)
+            DomainDNSName = $type.InvokeMember('DomainDNSName','GetProperty',$null,$ADSystemInfo,$null)
+            ForestDNSName = $type.InvokeMember('ForestDNSName','GetProperty',$null,$ADSystemInfo,$null)
+            PDCRoleOwnerDistinguishedName = $type.InvokeMember('PDCRoleOwner','GetProperty',$null,$ADSystemInfo,$null)
+            SchemaRoleOwnerDistinguishedName = $type.InvokeMember('SchemaRoleOwner','GetProperty',$null,$ADSystemInfo,$null)
+            IsNativeModeDomain = $type.InvokeMember('IsNativeMode','GetProperty',$null,$ADSystemInfo,$null)
+        }
+
+    }
+
+    catch
+    {
+
+        throw
+    }
+}
+
 # Get current script execution path and the parent path
 $0 = $myInvocation.MyCommand.Definition
 $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
@@ -5,12 +37,46 @@ $bits = Get-Item $env:dp0 | Split-Path -Parent
 $env:AutoSPPath = $bits + "\AutoSPInstaller"
 
 $AutoSPXML = [xml](get-content "$env:AutoSPPath\Default_AutoSPInstallerInput.xml" -EA 0)
+    
+# Start Logging of CORE AD Info Tab data
+$netbios = (Get-LocalLogonInformation).DomainShortName
+$dnsName = (Get-LocalLogonInformation).DomainDNSName
+$forestName = (Get-LocalLogonInformation).ForestDNSName
+$dom = [System.DirectoryServices.ActiveDirectory.Domain]::getcurrentdomain()
+$domControllers = $dom.DomainControllers | Select Name
+$dcs = ""
+
+foreach($domController in $domControllers)
+{
+    $dcName = $domController.Name
+    $dcShortName = $dcName.Split(".")
+    if($dcs -eq ""){$dcs = $dcShortName[0]}
+    else{$dcs = $dcs + ", " + $dcShortName[0]}
+}
 
 $custNum = Read-Host "Enter the Customer Account Number "
+$ticketNum = Read-Host "What is the Install Ticket Number? "
+
+# Open/Create the CORE AD Info file    
+$text = "$env:dp0\COREInfo.txt"
+
+"<b>Forest:</b> $forestName" | out-file "$text"
+"<b>Domain:</b> $dnsName" | out-file "$text" -Append
+"<b>NetBios:</b> $netbios" | out-file "$text" -Append
+"<b>Domain Controllers:</b> $dcs" | out-file "$text" -Append
+"<b>Restore password:</b> " | out-file "$text" -Append
+
+$loggedOnUser = [Environment]::UserName
+$loDomainUser = $netbios + "\" + $loggedOnUser
+"<b>Domain Admin Account:</b> $loDomainUser" | out-file "$text" -Append
+
+
 
 # Get the Farm Prefix
 $FarmPrefix = Read-Host "Enter a Prefix to be used in the Farm (MAX 5 chars - ex. Dev or Prod or Leave Blank for No Prefix) "   
 $AutoSPXML.Configuration.Farm.Database.DBPrefix = [string]$FarmPrefix
+
+"<b>SharePoint Farm:</b> $FarmPrefix" | out-file "$text" -Append
 
 # Set the Environment attribute
 $AutoSPXML.Configuration.Environment = $custNum + "_" + $FarmPrefix
@@ -51,9 +117,19 @@ Write-Host ""
 
 $AutoSPXML.Configuration.Install.SKU = [string]$Edition
 
+$spVer = $Version + " " + $Edition
+"<b>SharePoint Version:</b> SharePoint $spVer" | out-file "$text" -Append
+
+$custKey = Read-Host "Is this a customer provided license? (Blank/Default = N) "
+
 if($Edition -ne "Foundation"){$ProductKey = Read-Host "Enter the Product Installation Key "}
 else{$ProductKey = ""}
 $AutoSPXML.Configuration.Install.PIDKey = [string]$ProductKey
+
+if($custKey -eq "y" -or "Y")
+{
+    "<b>Customer Key:</b> $ProductKey" | out-file "$text" -Append
+}
 
 $FarmPass = Read-Host "Enter the Passphrase to use for the Farm (Blank/Default = R@ckSp@ce!sK!ng) "
 $FarmPass
@@ -63,17 +139,28 @@ if([string]::IsNullOrEmpty($FarmPass))
 }
 $AutoSPXML.Configuration.Farm.Passphrase = [string]$FarmPass
 
+"<b>Farm Passphrase:</b> $FarmPass" | out-file "$text" -Append
+
 if($Version -eq "2013")
 {
     $AppDomain = Read-Host "What is the App Domain? (Leave blank if unknown...)"
     $AutoSPXML.Configuration.ServiceApps.AppManagementService.AppDomain = [string]$AppDomain
 
+    "<b>App Domain:</b> $AppDomain" | out-file "$text" -Append
+
     $AppPrefix = Read-Host "What is the App Prefix? (Leave blank if unknown...)"
     $AutoSPXML.Configuration.ServiceApps.SubscriptionSettingsService.AppSiteSubscriptionName = [string]$AppPrefix
+
+    "<b>App Prefix:</b> $AppPrefix" | out-file "$text" -Append
 }
+
+"" | out-file "$text" -Append
 
 # Populate Server/Service Architecture
 $numServers = Read-Host "How many servers are in this Farm? "
+
+$wfe = ""
+$apps = ""
 
 for($i=1; $i -le $numServers; $i++)
 {
@@ -99,9 +186,14 @@ for($i=1; $i -le $numServers; $i++)
         switch($Choice)
         {
             1 { 
-
+                    if($wfe -eq ""){$wfe = $serverName}
+                    else{$wfe = $wfe + ", " + $serverName}
+                    
               }
             2 {
+                    if($apps -eq ""){$apps = $serverName}
+                    else{$apps = $apps + ", " + $serverName}
+                    
                     $CurrBCSServers = $AutoSPXML.Configuration.ServiceApps.BusinessDataConnectivity.Provision
                     if($CurrBCSServers -eq ""){$NewBCSServers = $serverName}
                     else{$NewBCSServers = $CurrBCSServers + " " + $serverName}
@@ -242,6 +334,35 @@ for($i=1; $i -le $numServers; $i++)
     while($Choice -ne "9")
 }
 
+"<b>Sharepoint Topology</b>" | out-file "$text" -Append
+"------------------" | out-file "$text" -Append
+
+"<b>WFE:</b> $wfe" | out-file "$text" -Append
+
+"<b>Application:</b> $Apps" | out-file "$text" -Append
+    
+$ca = $AutoSPXML.Configuration.Farm.CentralAdmin.Provision
+"<b>Central Admin:</b> $ca" | out-file "$text" -Append
+
+$indexCrawl = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.IndexComponent.Server.Name
+$indexScrubbed = $indexCrawl.Replace(" ", ", ")
+"<b>Index Crawler:</b> $indexScrubbed" | out-file "$text" -Append
+
+$query = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
+$queryScrubbed = $query.Replace(" ", ", ")
+"<b>Query:</b> $queryScrubbed" | out-file "$text" -Append
+
+$dbServer = $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance
+"<b>Database:</b> $dbServer" | out-file "$text" -Append
+
+$dbAlias = $AutoSPXML.Configuration.Farm.Database.DBServer
+"<b>SQL Alias:</b> $dbAlias" | out-file "$text" -Append
+
+"" | out-file "$text" -Append
+
+"<b>Install Ticket:</b> $ticketNum" | out-file "$text" -Append
+
+"" | out-file "$text" -Append
 
 #End Region Get Input Variables 
 $AutoSPXML.Save("$env:AutoSPPath\AutoSPInstallerInput.xml")
