@@ -64,7 +64,7 @@ function New-ADUser
     #If the user exists do nothing otherwise create the new user account
     if($UserExists -ne $null)
     {        
-        Write-Output "User $AccountName exists! Skipping..."        
+        Write-Output "User $AccountName exists! Skipping..."      
     }
     else
     {                     
@@ -81,16 +81,19 @@ function New-ADUser
         $newuser.setinfo()
         $newuser.userAccountControl = 66048
         $newuser.setinfo()
+
+        if($type -eq "Farm Admin")
+        {
+            $groupPath = "LDAP://CN=Domain Admins, CN=Users," + $rootDSE.defaultNamingContext
+            $group = [ADSI]$groupPath
+            $members = $group.member
+            $group.member = $members + $newUser.distinguishedName
+            $group.setinfo()
+        }
+
     }
 
-    if($type -eq "Farm Admin")
-    {
-        $groupPath = "LDAP://CN=Domain Admins, CN=Users," + $rootDSE.defaultNamingContext
-        $group = [ADSI]$groupPath
-        $members = $group.member
-        $group.member = $members+$newuser.distinguishedName
-        $group.setinfo()
-    }
+    
 }
 
 #Function Get NetBios Name for current AD
@@ -349,22 +352,28 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Enterprise")
     if(UserExists $ExcelUser){$pass = Read-Host "User $ExcelUser Exists! Please enter existing Password ";CreateServAcct $ExcelUser "Excel User" $pass}
     else{$pass = Get-ComplexPassword; CreateServAcct $ExcelUser "Excel User" $pass}
 
-    $AutoSPXML.Configuration.EnterpriseServiceApps.ExcelServices.UnattendedIDUser = $netbios + "\" + $ExcelUser
-    $AutoSPXML.Configuration.EnterpriseServiceApps.ExcelServices.UnattendedIDPassword = $pass
+    $uid = $netbios + "\" + $ExcelUser
+
+    $AutoSPXML.Configuration.EnterpriseServiceApps.ExcelServices.UnattendedIDUser = [string]$uid
+    $AutoSPXML.Configuration.EnterpriseServiceApps.ExcelServices.UnattendedIDPassword = [string]$pass
 
     $VisioUser = $AcctPrefix + "SP_VisioUser"
     if(UserExists $VisioUser){$pass = Read-Host "User $VisioUser Exists! Please enter existing Password ";CreateServAcct $VisioUser "Visio User" $pass}
     else{$pass = Get-ComplexPassword; CreateServAcct $VisioUser "Visio User" $pass}
 
-    $AutoSPXML.Configuration.EnterpriseServiceApps.VisioService.UnattendedIDUser = $netbios + "\" + $VisioUser
-    $AutoSPXML.Configuration.EnterpriseServiceApps.VisioService.UnattendedIDPassword = $pass
+    $uid = $netbios + "\" + $VisioUser
+
+    $AutoSPXML.Configuration.EnterpriseServiceApps.VisioService.UnattendedIDUser = [string]$uid
+    $AutoSPXML.Configuration.EnterpriseServiceApps.VisioService.UnattendedIDPassword = [string]$pass
 
     $PerfPointUser = $AcctPrefix + "SP_PerfPtUser"
     if(UserExists $PerfPointUser){$pass = Read-Host "User $PerfPointUser Exists! Please enter existing Password ";CreateServAcct $PerfPointUser "PerfPoint User" $pass}
     else{$pass = Get-ComplexPassword; CreateServAcct $PerfPointUser "PerfPoint User" $pass}
 
-    $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.UnattendedIDUser = $netbios + "\" + $PerfPointUser
-    $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.UnattendedIDPassword = $pass
+    $uid = $netbios + "\" + $PerfPointUser
+
+    $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.UnattendedIDUser = [string]$uid
+    $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.UnattendedIDPassword = [string]$pass
 }
 
 # Complete CORE AD logging file

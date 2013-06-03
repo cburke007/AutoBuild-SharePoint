@@ -126,7 +126,7 @@ if($Edition -ne "Foundation"){$ProductKey = Read-Host "Enter the Product Install
 else{$ProductKey = ""}
 $AutoSPXML.Configuration.Install.PIDKey = [string]$ProductKey
 
-if($custKey -eq "y" -or "Y")
+if($custKey -eq "y" -or $custKey -eq "Y")
 {
     "<b>Customer Key:</b> $ProductKey" | out-file "$text" -Append
 }

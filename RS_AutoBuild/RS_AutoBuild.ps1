@@ -1,5 +1,5 @@
 #* FileName: RS_AutoBuild.ps1
-#* Version 1.0
+#* Version 5.0
 #*=============================================
 #* Script Name: [RS_AutoBuild.ps1]
 #* Created: [4/2/2013]
