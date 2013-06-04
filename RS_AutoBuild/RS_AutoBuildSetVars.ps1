@@ -174,20 +174,29 @@ for($i=1; $i -le $numServers; $i++)
         Write-Host -ForegroundColor Cyan "1. Web Front-End" 
         Write-Host -ForegroundColor Cyan "2. Application"
         Write-Host -ForegroundColor Cyan "3. Index"
-        Write-Host -ForegroundColor Cyan "4. Query"
-        Write-Host -ForegroundColor Cyan "5. Database"
-        Write-Host -ForegroundColor Cyan "6. Central Administration (Only Choose this Role for one server)"
-        Write-Host -ForegroundColor Cyan "7. Search Administration (Only Choose this Role for one server)"
-        Write-Host -ForegroundColor Cyan "8. User Profile Sync (Only Choose this Role for one server)"
-        Write-Host -ForegroundColor Cyan "9. Done adding Roles"
+        Write-Host -ForegroundColor Cyan "4. Database"
+        Write-Host -ForegroundColor Cyan "5. Central Administration (Only Choose this Role for one server)"
+        Write-Host -ForegroundColor Cyan "6. Search Administration (Only Choose this Role for one server)"
+        Write-Host -ForegroundColor Cyan "7. User Profile Sync (Only Choose this Role for one server)"
+        Write-Host -ForegroundColor Cyan "8. Done adding Roles"
         Write-Host -ForegroundColor Cyan " "
-        $Choice = Read-Host "Select 1-9: "
+        $Choice = Read-Host "Select 1-8: "
         
         switch($Choice)
         {
             1 { 
                     if($wfe -eq ""){$wfe = $serverName}
                     else{$wfe = $wfe + ", " + $serverName}
+
+                    $CurrQueryServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
+                    if($CurrQueryServers -eq ""){$NewQueryServers = $serverName}
+                    else{$NewQueryServers = $CurrQueryServers + " " + $serverName}
+                    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.SetAttribute("Name", $NewQueryServers)
+
+                    $CurrSQSSServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.Name
+                    if($CurrSQSSServers -eq ""){$NewSQSSServers = $serverName}
+                    else{$NewSQSSServers = $CurrSQSSServers + " " + $serverName}
+                    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.SetAttribute("Name", $NewSQSSServers)
                     
               }
             2 {
@@ -296,18 +305,8 @@ for($i=1; $i -le $numServers; $i++)
                     else{$NewAnalyticsServers = $CurrAnalyticsServers + " " + $serverName}
                     $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AnalyticsProcessingComponent.Server.SetAttribute("Name", $NewAnalyticsServers)      
               }
-            4 {
-                    $CurrQueryServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
-                    if($CurrQueryServers -eq ""){$NewQueryServers = $serverName}
-                    else{$NewQueryServers = $CurrQueryServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.SetAttribute("Name", $NewQueryServers)
 
-                    $CurrSQSSServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.Name
-                    if($CurrSQSSServers -eq ""){$NewSQSSServers = $serverName}
-                    else{$NewSQSSServers = $CurrSQSSServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.SetAttribute("Name", $NewSQSSServers)
-              }
-            5 {
+            4 {
 					$FarmDBServerAlias = Read-Host "Enter an Alias for the SQL Server $serverName (Blank/Default = SharePointSQL) "
 					if([string]::IsNullOrEmpty($FarmDBServerAlias))
 					{
@@ -318,20 +317,20 @@ for($i=1; $i -le $numServers; $i++)
 
                     $AutoSPXML.Configuration.Farm.Database.DBServer = "$FarmDBServerAlias"
               } 
-            6 {
+            5 {
                     $AutoSPXML.Configuration.Farm.CentralAdmin.SetAttribute("Provision", $serverName)
               } 
-            7 {
+            6 {
                     $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AdminComponent.Server.SetAttribute("Name", $serverName)
               } 
-            8 {
+            7 {
                     $AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SetAttribute("Provision", $serverName)
               }        
         }
         
         
     }
-    while($Choice -ne "9")
+    while($Choice -ne "8")
 }
 
 "<b>Sharepoint Topology</b>" | out-file "$text" -Append
