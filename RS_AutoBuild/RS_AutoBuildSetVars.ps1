@@ -70,8 +70,6 @@ $loggedOnUser = [Environment]::UserName
 $loDomainUser = $netbios + "\" + $loggedOnUser
 "<b>Domain Admin Account:</b> $loDomainUser" | out-file "$text" -Append
 
-
-
 # Get the Farm Prefix
 $FarmPrefix = Read-Host "Enter a Prefix to be used in the Farm (MAX 5 chars - ex. Dev or Prod or Leave Blank for No Prefix) "   
 $AutoSPXML.Configuration.Farm.Database.DBPrefix = [string]$FarmPrefix
@@ -120,11 +118,10 @@ $AutoSPXML.Configuration.Install.SKU = [string]$Edition
 $spVer = $Version + " " + $Edition
 "<b>SharePoint Version:</b> SharePoint $spVer" | out-file "$text" -Append
 
-$custKey = Read-Host "Is this a customer provided license? (Blank/Default = N) "
-
-if($Edition -ne "Foundation"){$ProductKey = Read-Host "Enter the Product Installation Key "}
-else{$ProductKey = ""}
+if($Edition -ne "Foundation"){$custKey = Read-Host "Is this a customer provided license? (Blank/Default = N) "; $ProductKey = Read-Host "Enter the Product Installation Key "}
+else{$ProductKey = "THISI-SAFAK-EPROD-UCTKE-YHAHA"}
 $AutoSPXML.Configuration.Install.PIDKey = [string]$ProductKey
+
 
 if($custKey -eq "y" -or $custKey -eq "Y")
 {
@@ -162,175 +159,275 @@ $numServers = Read-Host "How many servers are in this Farm? "
 $wfe = ""
 $apps = ""
 
-for($i=1; $i -le $numServers; $i++)
+if($Edition -eq "Foundation")
 {
-    $serverName = Read-Host "What is the name of Server $i ? "   
+    $portalAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "Portal"}
+    $portalAppNode.SiteCollections.SiteCollection.Template = "STS#0"
     
-    $Choice = ""
-    Do
+    for($i=1; $i -le $numServers; $i++)
     {
-        #Choose the edition of SharePoint 2010 you are installing
-        Write-Host -ForegroundColor Yellow "Choose a Role for server $serverName "
-        Write-Host -ForegroundColor Cyan "1. Web Front-End" 
-        Write-Host -ForegroundColor Cyan "2. Application"
-        Write-Host -ForegroundColor Cyan "3. Index"
-        Write-Host -ForegroundColor Cyan "4. Database"
-        Write-Host -ForegroundColor Cyan "5. Central Administration (Only Choose this Role for one server)"
-        Write-Host -ForegroundColor Cyan "6. Search Administration (Only Choose this Role for one server)"
-        Write-Host -ForegroundColor Cyan "7. User Profile Sync (Only Choose this Role for one server)"
-        Write-Host -ForegroundColor Cyan "8. Done adding Roles"
-        Write-Host -ForegroundColor Cyan " "
-        $Choice = Read-Host "Select 1-8: "
-        
-        switch($Choice)
+        $serverName = Read-Host "What is the name of Server $i ? "   
+    
+        $Choice = ""
+        Do
         {
-            1 { 
-                    if($wfe -eq ""){$wfe = $serverName}
-                    else{$wfe = $wfe + ", " + $serverName}
+            #Choose the edition of SharePoint 2010 you are installing
+            Write-Host -ForegroundColor Yellow "Choose a Role for server $serverName "
+            Write-Host -ForegroundColor Cyan "1. Web Front-End" 
+            Write-Host -ForegroundColor Cyan "2. Application"
+            Write-Host -ForegroundColor Cyan "3. Database"
+            Write-Host -ForegroundColor Cyan "4. Central Administration (Only Choose this Role for one server)"
+            Write-Host -ForegroundColor Cyan "5. Done adding Roles"
+            Write-Host -ForegroundColor Cyan " "
+            $Choice = Read-Host "Select 1-5: "
+        
+            switch($Choice)
+            {
+                1 { 
+                        if($wfe -eq ""){$wfe = $serverName}
+                        else{$wfe = $wfe + ", " + $serverName}
 
-                    $CurrQueryServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
-                    if($CurrQueryServers -eq ""){$NewQueryServers = $serverName}
-                    else{$NewQueryServers = $CurrQueryServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.SetAttribute("Name", $NewQueryServers)
+                        $CurrQueryServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
+                        if($CurrQueryServers -eq "false"){$NewQueryServers = $serverName}
+                        else{$NewQueryServers = $CurrQueryServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.SetAttribute("Name", $NewQueryServers)
 
-                    $CurrSQSSServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.Name
-                    if($CurrSQSSServers -eq ""){$NewSQSSServers = $serverName}
-                    else{$NewSQSSServers = $CurrSQSSServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.SetAttribute("Name", $NewSQSSServers)
+                        $CurrSQSSServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.Name
+                        if($CurrSQSSServers -eq "false"){$NewSQSSServers = $serverName}
+                        else{$NewSQSSServers = $CurrSQSSServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.SetAttribute("Name", $NewSQSSServers)
                     
-              }
-            2 {
-                    if($apps -eq ""){$apps = $serverName}
-                    else{$apps = $apps + ", " + $serverName}
+                  }
+                2 {
+                        if($apps -eq ""){$apps = $serverName}
+                        else{$apps = $apps + ", " + $serverName}
                     
-                    $CurrBCSServers = $AutoSPXML.Configuration.ServiceApps.BusinessDataConnectivity.Provision
-                    if($CurrBCSServers -eq ""){$NewBCSServers = $serverName}
-                    else{$NewBCSServers = $CurrBCSServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.BusinessDataConnectivity.SetAttribute("Provision", $NewBCSServers)
+                        $CurrBCSServers = $AutoSPXML.Configuration.ServiceApps.BusinessDataConnectivity.Provision
+                        if($CurrBCSServers -eq "false"){$NewBCSServers = $serverName}
+                        else{$NewBCSServers = $CurrBCSServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.BusinessDataConnectivity.SetAttribute("Provision", $NewBCSServers)
 
-                    $CurrMMDataServers = $AutoSPXML.Configuration.ServiceApps.ManagedMetadataServiceApp.Provision
-                    if($CurrMMDataServers -eq ""){$NewMMDataServers = $serverName}
-                    else{$NewMMDataServers = $CurrMMDataServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.ManagedMetadataServiceApp.SetAttribute("Provision", $NewMMDataServers)
-                    
-                    $CurrWordServers = $AutoSPXML.Configuration.ServiceApps.WordAutomationService.Provision
-                    if($CurrWordServers -eq ""){$NewWordServers = $serverName}
-                    else{$NewWordServers = $CurrWordServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.WordAutomationService.SetAttribute("Provision", $NewWordServers)
-                    
-                    $CurrAppMgmtServers = $AutoSPXML.Configuration.ServiceApps.AppManagementService.Provision
-                    if($CurrAppMgmtServers -eq ""){$NewAppMgmtServers = $serverName}
-                    else{$NewAppMgmtServers = $CurrAppMgmtServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.AppManagementService.SetAttribute("Provision", $NewAppMgmtServers)
+                        $CurrAppMgmtServers = $AutoSPXML.Configuration.ServiceApps.AppManagementService.Provision
+                        if($CurrAppMgmtServers -eq "false"){$NewAppMgmtServers = $serverName}
+                        else{$NewAppMgmtServers = $CurrAppMgmtServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.AppManagementService.SetAttribute("Provision", $NewAppMgmtServers)
 
-                    $CurrSubscServers = $AutoSPXML.Configuration.ServiceApps.SubscriptionSettingsService.Provision
-                    if($CurrSubscServers -eq ""){$NewSubscServers = $serverName}
-                    else{$NewSubscServers = $CurrSubscServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.SubscriptionSettingsService.SetAttribute("Provision", $NewSubscServers)
+                        $CurrSubscServers = $AutoSPXML.Configuration.ServiceApps.SubscriptionSettingsService.Provision
+                        if($CurrSubscServers -eq "false"){$NewSubscServers = $serverName}
+                        else{$NewSubscServers = $CurrSubscServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.SubscriptionSettingsService.SetAttribute("Provision", $NewSubscServers)
 
-                    $CurrWorkMgmtServers = $AutoSPXML.Configuration.ServiceApps.WorkManagementService.Provision
-                    if($CurrWorkMgmtServers -eq ""){$NewWorkMgmtServers = $serverName}
-                    else{$NewWorkMgmtServers = $CurrWorkMgmtServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.WorkManagementService.SetAttribute("Provision", $NewWorkMgmtServers)
+                        $CurrUsageServers = $AutoSPXML.Configuration.ServiceApps.SPUsageService.Provision
+                        if($CurrUsageServers -eq "false"){$NewUsageServers = $serverName}
+                        else{$NewUsageServers = $CurrUsageServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.SPUsageService.SetAttribute("Provision", $NewUsageServers)
 
-                    $CurrMTransServers = $AutoSPXML.Configuration.ServiceApps.MachineTranslationService.Provision
-                    if($CurrMTransServers -eq ""){$NewMTransServers = $serverName}
-                    else{$NewMTransServers = $CurrMTransServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.MachineTranslationService.SetAttribute("Provision", $NewMTransServers)
+                        $CurrStateServers = $AutoSPXML.Configuration.ServiceApps.StateService.Provision
+                        if($CurrStateServers -eq "false"){$NewStateServers = $serverName}
+                        else{$NewStateServers = $CurrStateServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.StateService.SetAttribute("Provision", $NewStateServers)
 
-                    $CurrPPTServers = $AutoSPXML.Configuration.ServiceApps.PowerPointConversionService.Provision
-                    if($CurrPPTServers -eq ""){$NewPPTServers = $serverName}
-                    else{$NewPPTServers = $CurrPPTServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.PowerPointConversionService.SetAttribute("Provision", $NewPPTServers)
+                        
+                  }
+                
+                3 {
+					    $FarmDBServerAlias = Read-Host "Enter an Alias for the SQL Server $serverName (Blank/Default = SharePointSQL) "
+					    if([string]::IsNullOrEmpty($FarmDBServerAlias))
+					    {
+						    $FarmDBServerAlias = "SharePointSQL"
+					    }
+					    $AutoSPXML.Configuration.Farm.Database.DBAlias.Create = "true"
+                        $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance = "$serverName"
 
-                    $CurrSStoreServers = $AutoSPXML.Configuration.ServiceApps.SecureStoreService.Provision
-                    if($CurrSStoreServers -eq ""){$NewSStoreServers = $serverName}
-                    else{$NewSStoreServers = $CurrSStoreServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.SecureStoreService.SetAttribute("Provision", $NewSStoreServers)
-
-                    $CurrUsageServers = $AutoSPXML.Configuration.ServiceApps.SPUsageService.Provision
-                    if($CurrUsageServers -eq ""){$NewUsageServers = $serverName}
-                    else{$NewUsageServers = $CurrUsageServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.SPUsageService.SetAttribute("Provision", $NewUsageServers)
-
-                    $CurrWebAnalyticsServers = $AutoSPXML.Configuration.ServiceApps.WebAnalyticsService.Provision
-                    if($CurrWebAnalyticsServers -eq ""){$NewWebAnalyticsServers = $serverName}
-                    else{$NewWebAnalyticsServers = $CurrWebAnalyticsServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.WebAnalyticsService.SetAttribute("Provision", $NewWebAnalyticsServers)
-
-                    $CurrStateServers = $AutoSPXML.Configuration.ServiceApps.StateService.Provision
-                    if($CurrStateServers -eq ""){$NewStateServers = $serverName}
-                    else{$NewStateServers = $CurrStateServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.StateService.SetAttribute("Provision", $NewStateServers)
-
-                    $CurrExcelServers = $AutoSPXML.Configuration.EnterpriseServiceApps.ExcelServices.Provision
-                    if($CurrExcelServers -eq ""){$NewExcelServers = $serverName}
-                    else{$NewExcelServers = $CurrExcelServers + " " + $serverName}
-                    $AutoSPXML.Configuration.EnterpriseServiceApps.ExcelServices.SetAttribute("Provision", $NewExcelServers)
-
-                    $CurrVisioServers = $AutoSPXML.Configuration.EnterpriseServiceApps.VisioService.Provision
-                    if($CurrVisioServers -eq ""){$NewVisioServers = $serverName}
-                    else{$NewVisioServers = $CurrVisioServers + " " + $serverName}
-                    $AutoSPXML.Configuration.EnterpriseServiceApps.VisioService.SetAttribute("Provision", $NewVisioServers)
-
-                    $AccessNode = $AutoSPXML.Configuration.EnterpriseServiceApps.AccessService | ?{$_.Name -eq "Access 2010 Services"}
-                    $CurrAccessServers = $AccessNode.Provision
-                    if($CurrAccessServers -eq ""){$NewAccessServers = $serverName}
-                    else{$NewAccessServers = $CurrAccessServers + " " + $serverName}
-                    $AccessNode.SetAttribute("Provision", $NewAccessServers)
-
-                    $CurrPerformancePointServers = $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.Provision
-                    if($CurrPerformancePointServers -eq ""){$NewPerformancePointServers = $serverName}
-                    else{$NewPerformancePointServers = $CurrPerformancePointServers + " " + $serverName}
-                    $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.SetAttribute("Provision", $NewPerformancePointServers)
-              }
-            3 {
-                    $CurrCrawlServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.CrawlComponent.Server.Name
-                    if($CurrCrawlServers -eq ""){$NewCrawlServers = $serverName}
-                    else{$NewCrawlServers = $CurrCrawlServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.CrawlComponent.Server.SetAttribute("Name", $NewCrawlServers)
-
-                    $CurrIndexServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.IndexComponent.Server.Name
-                    if($CurrIndexServers -eq ""){$NewIndexServers = $serverName}
-                    else{$NewIndexServers = $CurrIndexServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.IndexComponent.Server.SetAttribute("Name", $NewIndexServers)
-
-                    $CurrContentServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ContentProcessingComponent.Server.Name
-                    if($CurrContentServers -eq ""){$NewContentServers = $serverName}
-                    else{$NewContentServers = $CurrContentServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ContentProcessingComponent.Server.SetAttribute("Name", $NewContentServers)
-
-                    $CurrAnalyticsServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AnalyticsProcessingComponent.Server.Name
-                    if($CurrAnalyticsServers -eq ""){$NewAnalyticsServers = $serverName}
-                    else{$NewAnalyticsServers = $CurrAnalyticsServers + " " + $serverName}
-                    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AnalyticsProcessingComponent.Server.SetAttribute("Name", $NewAnalyticsServers)      
-              }
-
-            4 {
-					$FarmDBServerAlias = Read-Host "Enter an Alias for the SQL Server $serverName (Blank/Default = SharePointSQL) "
-					if([string]::IsNullOrEmpty($FarmDBServerAlias))
-					{
-						$FarmDBServerAlias = "SharePointSQL"
-					}
-					$AutoSPXML.Configuration.Farm.Database.DBAlias.Create = "true"
-                    $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance = "$serverName"
-
-                    $AutoSPXML.Configuration.Farm.Database.DBServer = "$FarmDBServerAlias"
-              } 
-            5 {
-                    $AutoSPXML.Configuration.Farm.CentralAdmin.SetAttribute("Provision", $serverName)
-              } 
-            6 {
-                    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AdminComponent.Server.SetAttribute("Name", $serverName)
-              } 
-            7 {
-                    $AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SetAttribute("Provision", $serverName)
-              }        
+                        $AutoSPXML.Configuration.Farm.Database.DBServer = "$FarmDBServerAlias"
+                  } 
+                4 {
+                        $AutoSPXML.Configuration.Farm.CentralAdmin.SetAttribute("Provision", $serverName)
+                  } 
+            }
+        
+        
         }
-        
-        
+        while($Choice -ne "5")
     }
-    while($Choice -ne "8")
+}
+
+elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
+{
+    for($i=1; $i -le $numServers; $i++)
+    {
+        $serverName = Read-Host "What is the name of Server $i ? "   
+    
+        $Choice = ""
+        Do
+        {
+            #Choose the edition of SharePoint 2010 you are installing
+            Write-Host -ForegroundColor Yellow "Choose a Role for server $serverName "
+            Write-Host -ForegroundColor Cyan "1. Web Front-End" 
+            Write-Host -ForegroundColor Cyan "2. Application"
+            Write-Host -ForegroundColor Cyan "3. Index"
+            Write-Host -ForegroundColor Cyan "4. Database"
+            Write-Host -ForegroundColor Cyan "5. Central Administration (Only Choose this Role for one server)"
+            Write-Host -ForegroundColor Cyan "6. Search Administration (Only Choose this Role for one server)"
+            Write-Host -ForegroundColor Cyan "7. User Profile Sync (Only Choose this Role for one server)"
+            Write-Host -ForegroundColor Cyan "8. Done adding Roles"
+            Write-Host -ForegroundColor Cyan " "
+            $Choice = Read-Host "Select 1-8: "
+        
+            switch($Choice)
+            {
+                1 { 
+                        if($wfe -eq ""){$wfe = $serverName}
+                        else{$wfe = $wfe + ", " + $serverName}
+
+                        $CurrQueryServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
+                        if($CurrQueryServers -eq "false"){$NewQueryServers = $serverName}
+                        else{$NewQueryServers = $CurrQueryServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.SetAttribute("Name", $NewQueryServers)
+
+                        $CurrSQSSServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.Name
+                        if($CurrSQSSServers -eq "false"){$NewSQSSServers = $serverName}
+                        else{$NewSQSSServers = $CurrSQSSServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.SetAttribute("Name", $NewSQSSServers)
+                    
+                  }
+                2 {
+                        if($apps -eq ""){$apps = $serverName}
+                        else{$apps = $apps + ", " + $serverName}
+                    
+                        $CurrBCSServers = $AutoSPXML.Configuration.ServiceApps.BusinessDataConnectivity.Provision
+                        if($CurrBCSServers -eq "false"){$NewBCSServers = $serverName}
+                        else{$NewBCSServers = $CurrBCSServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.BusinessDataConnectivity.SetAttribute("Provision", $NewBCSServers)
+
+                        $CurrMMDataServers = $AutoSPXML.Configuration.ServiceApps.ManagedMetadataServiceApp.Provision
+                        if($CurrMMDataServers -eq "false"){$NewMMDataServers = $serverName}
+                        else{$NewMMDataServers = $CurrMMDataServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.ManagedMetadataServiceApp.SetAttribute("Provision", $NewMMDataServers)
+                    
+                        $CurrWordServers = $AutoSPXML.Configuration.ServiceApps.WordAutomationService.Provision
+                        if($CurrWordServers -eq "false"){$NewWordServers = $serverName}
+                        else{$NewWordServers = $CurrWordServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.WordAutomationService.SetAttribute("Provision", $NewWordServers)
+                    
+                        $CurrAppMgmtServers = $AutoSPXML.Configuration.ServiceApps.AppManagementService.Provision
+                        if($CurrAppMgmtServers -eq "false"){$NewAppMgmtServers = $serverName}
+                        else{$NewAppMgmtServers = $CurrAppMgmtServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.AppManagementService.SetAttribute("Provision", $NewAppMgmtServers)
+
+                        $CurrSubscServers = $AutoSPXML.Configuration.ServiceApps.SubscriptionSettingsService.Provision
+                        if($CurrSubscServers -eq "false"){$NewSubscServers = $serverName}
+                        else{$NewSubscServers = $CurrSubscServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.SubscriptionSettingsService.SetAttribute("Provision", $NewSubscServers)
+
+                        $CurrWorkMgmtServers = $AutoSPXML.Configuration.ServiceApps.WorkManagementService.Provision
+                        if($CurrWorkMgmtServers -eq "false"){$NewWorkMgmtServers = $serverName}
+                        else{$NewWorkMgmtServers = $CurrWorkMgmtServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.WorkManagementService.SetAttribute("Provision", $NewWorkMgmtServers)
+
+                        $CurrMTransServers = $AutoSPXML.Configuration.ServiceApps.MachineTranslationService.Provision
+                        if($CurrMTransServers -eq "false"){$NewMTransServers = $serverName}
+                        else{$NewMTransServers = $CurrMTransServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.MachineTranslationService.SetAttribute("Provision", $NewMTransServers)
+
+                        $CurrPPTServers = $AutoSPXML.Configuration.ServiceApps.PowerPointConversionService.Provision
+                        if($CurrPPTServers -eq "false"){$NewPPTServers = $serverName}
+                        else{$NewPPTServers = $CurrPPTServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.PowerPointConversionService.SetAttribute("Provision", $NewPPTServers)
+
+                        $CurrSStoreServers = $AutoSPXML.Configuration.ServiceApps.SecureStoreService.Provision
+                        if($CurrSStoreServers -eq "false"){$NewSStoreServers = $serverName}
+                        else{$NewSStoreServers = $CurrSStoreServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.SecureStoreService.SetAttribute("Provision", $NewSStoreServers)
+
+                        $CurrUsageServers = $AutoSPXML.Configuration.ServiceApps.SPUsageService.Provision
+                        if($CurrUsageServers -eq "false"){$NewUsageServers = $serverName}
+                        else{$NewUsageServers = $CurrUsageServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.SPUsageService.SetAttribute("Provision", $NewUsageServers)
+
+                        $CurrWebAnalyticsServers = $AutoSPXML.Configuration.ServiceApps.WebAnalyticsService.Provision
+                        if($CurrWebAnalyticsServers -eq "false"){$NewWebAnalyticsServers = $serverName}
+                        else{$NewWebAnalyticsServers = $CurrWebAnalyticsServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.WebAnalyticsService.SetAttribute("Provision", $NewWebAnalyticsServers)
+
+                        $CurrStateServers = $AutoSPXML.Configuration.ServiceApps.StateService.Provision
+                        if($CurrStateServers -eq "false"){$NewStateServers = $serverName}
+                        else{$NewStateServers = $CurrStateServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.StateService.SetAttribute("Provision", $NewStateServers)
+                        
+                        if($Edition -eq "Enterprise")
+                        {
+                            $CurrExcelServers = $AutoSPXML.Configuration.EnterpriseServiceApps.ExcelServices.Provision
+                            if($CurrExcelServers -eq "false"){$NewExcelServers = $serverName}
+                            else{$NewExcelServers = $CurrExcelServers + " " + $serverName}
+                            $AutoSPXML.Configuration.EnterpriseServiceApps.ExcelServices.SetAttribute("Provision", $NewExcelServers)
+
+                            $CurrVisioServers = $AutoSPXML.Configuration.EnterpriseServiceApps.VisioService.Provision
+                            if($CurrVisioServers -eq "false"){$NewVisioServers = $serverName}
+                            else{$NewVisioServers = $CurrVisioServers + " " + $serverName}
+                            $AutoSPXML.Configuration.EnterpriseServiceApps.VisioService.SetAttribute("Provision", $NewVisioServers)
+
+                            $AccessNode = $AutoSPXML.Configuration.EnterpriseServiceApps.AccessService | ?{$_.Name -eq "Access 2010 Services"}
+                            $CurrAccessServers = $AccessNode.Provision
+                            if($CurrAccessServers -eq "false"){$NewAccessServers = $serverName}
+                            else{$NewAccessServers = $CurrAccessServers + " " + $serverName}
+                            $AccessNode.SetAttribute("Provision", $NewAccessServers)
+
+                            $CurrPerformancePointServers = $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.Provision
+                            if($CurrPerformancePointServers -eq "false"){$NewPerformancePointServers = $serverName}
+                            else{$NewPerformancePointServers = $CurrPerformancePointServers + " " + $serverName}
+                            $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.SetAttribute("Provision", $NewPerformancePointServers)
+                        }
+
+                  }
+                3 {
+                        $CurrCrawlServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.CrawlComponent.Server.Name
+                        if($CurrCrawlServers -eq "false"){$NewCrawlServers = $serverName}
+                        else{$NewCrawlServers = $CurrCrawlServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.CrawlComponent.Server.SetAttribute("Name", $NewCrawlServers)
+
+                        $CurrIndexServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.IndexComponent.Server.Name
+                        if($CurrIndexServers -eq "false"){$NewIndexServers = $serverName}
+                        else{$NewIndexServers = $CurrIndexServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.IndexComponent.Server.SetAttribute("Name", $NewIndexServers)
+
+                        $CurrContentServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ContentProcessingComponent.Server.Name
+                        if($CurrContentServers -eq "false"){$NewContentServers = $serverName}
+                        else{$NewContentServers = $CurrContentServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ContentProcessingComponent.Server.SetAttribute("Name", $NewContentServers)
+
+                        $CurrAnalyticsServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AnalyticsProcessingComponent.Server.Name
+                        if($CurrAnalyticsServers -eq "false"){$NewAnalyticsServers = $serverName}
+                        else{$NewAnalyticsServers = $CurrAnalyticsServers + " " + $serverName}
+                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AnalyticsProcessingComponent.Server.SetAttribute("Name", $NewAnalyticsServers)      
+                  }
+
+                4 {
+					    $FarmDBServerAlias = Read-Host "Enter an Alias for the SQL Server $serverName (Blank/Default = SharePointSQL) "
+					    if([string]::IsNullOrEmpty($FarmDBServerAlias))
+					    {
+						    $FarmDBServerAlias = "SharePointSQL"
+					    }
+					    $AutoSPXML.Configuration.Farm.Database.DBAlias.Create = "true"
+                        $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance = "$serverName"
+
+                        $AutoSPXML.Configuration.Farm.Database.DBServer = "$FarmDBServerAlias"
+                  } 
+                5 {
+                        $AutoSPXML.Configuration.Farm.CentralAdmin.SetAttribute("Provision", $serverName)
+                  } 
+                6 {
+                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AdminComponent.Server.SetAttribute("Name", $serverName)
+                  } 
+                7 {
+                        $AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SetAttribute("Provision", $serverName)
+                  }        
+            }
+        
+        
+        }
+        while($Choice -ne "8")
+    }
 }
 
 "<b>Sharepoint Topology</b>" | out-file "$text" -Append
@@ -338,7 +435,7 @@ for($i=1; $i -le $numServers; $i++)
 
 "<b>WFE:</b> $wfe" | out-file "$text" -Append
 
-"<b>Application:</b> $Apps" | out-file "$text" -Append
+"<b>Application:</b> $apps" | out-file "$text" -Append
     
 $ca = $AutoSPXML.Configuration.Farm.CentralAdmin.Provision
 "<b>Central Admin:</b> $ca" | out-file "$text" -Append

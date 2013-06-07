@@ -116,14 +116,14 @@
     </WebApplication>
   </WebApplications>
   <ServiceApps>
-    <ManagedMetadataServiceApp Provision="" Name="Managed Metadata Service" ProxyName="Managed Metadata Services Proxy">
+    <ManagedMetadataServiceApp Provision="false" Name="Managed Metadata Service" ProxyName="Managed Metadata Services Proxy">
       <Database>
         <Name>MetaData</Name>
         <DBServer />
         <DBAlias Create="false" DBInstance="" DBPort="" />
       </Database>
     </ManagedMetadataServiceApp>
-    <UserProfileServiceApp Provision="" Name="User Profile Services" ProxyName="User Profile Services Proxy" EnableNetBIOSDomainNames="false" StartProfileSync="true" CreateDefaultSyncConnection="true" SyncConnectionAccount="" SyncConnectionAccountPassword="">
+    <UserProfileServiceApp Provision="false" Name="User Profile Services" ProxyName="User Profile Services Proxy" EnableNetBIOSDomainNames="false" StartProfileSync="true" CreateDefaultSyncConnection="true" SyncConnectionAccount="" SyncConnectionAccountPassword="">
       <Database>
         <ProfileDB>Profile</ProfileDB>
         <SyncDB>Sync</SyncDB>
@@ -132,7 +132,7 @@
         <DBAlias Create="false" DBInstance="" DBPort="" />
       </Database>
     </UserProfileServiceApp>
-    <EnterpriseSearchService Provision="true" ContactEmail="" ConnectionTimeout="60" AcknowledgementTimeout="60" ProxyType="Default" IgnoreSSLWarnings="false" InternetIdentity="Mozilla/4.0 (compatible; MSIE 4.01; Windows NT; MS Search 6.0 Robot)" CustomIndexLocation="" PerformanceLevel="PartlyReduced" Account="DOMAIN\SP_SearchService" Password="" ShareName="SearchIndex">
+    <EnterpriseSearchService Provision="false" ContactEmail="" ConnectionTimeout="60" AcknowledgementTimeout="60" ProxyType="Default" IgnoreSSLWarnings="false" InternetIdentity="Mozilla/4.0 (compatible; MSIE 4.01; Windows NT; MS Search 6.0 Robot)" CustomIndexLocation="" PerformanceLevel="PartlyReduced" Account="DOMAIN\SP_SearchService" Password="" ShareName="SearchIndex">
       <EnterpriseSearchServiceApplications>
         <EnterpriseSearchServiceApplication Name="Search Service Application" DatabaseServer="" DatabaseName="Search" FailoverDatabaseServer="" Partitioned="false" Partitions="1" SearchServiceApplicationType="Regular" ContentAccessAccount="" ContentAccessAccountPassword="">
           <ApplicationPool Name="SharePoint Search Application Pool" Account="DOMAIN\SP_SearchService" Password="" />
@@ -165,7 +165,7 @@
         </EnterpriseSearchServiceApplication>
       </EnterpriseSearchServiceApplications>
     </EnterpriseSearchService>
-    <StateService Provision="" Name="State Services" ProxyName="State Services Proxy">
+    <StateService Provision="false" Name="State Services" ProxyName="State Services Proxy">
       <Database>
         <Name>StateService</Name>
         <DBServer />
@@ -180,62 +180,62 @@
         <DBAlias Create="false" DBInstance="SERVER\INSTANCE" DBPort="" />
       </Database>
     </WebAnalyticsService>
-    <SPUsageService Provision="" Name="Usage and Health Data Collection">
+    <SPUsageService Provision="false" Name="Usage and Health Data Collection">
       <Database>
         <Name>UsageAndHealth</Name>
         <DBServer />
         <DBAlias Create="false" DBInstance="" DBPort="" />
       </Database>
     </SPUsageService>
-    <SecureStoreService Provision="" Name="Secure Store Services" ProxyName="Secure Store Services Proxy">
+    <SecureStoreService Provision="false" Name="Secure Store Services" ProxyName="Secure Store Services Proxy">
       <Database>
         <Name>SecureStore</Name>
         <DBServer />
         <DBAlias Create="false" DBInstance="" DBPort="" />
       </Database>
     </SecureStoreService>
-    <BusinessDataConnectivity Provision="" Name="Business Data Connectivity Services" ProxyName="Business Data Connectivity Services Proxy">
+    <BusinessDataConnectivity Provision="false" Name="Business Data Connectivity Services" ProxyName="Business Data Connectivity Services Proxy">
       <Database>
         <Name>BusinessDataCatalog</Name>
         <DBServer />
         <DBAlias Create="false" DBInstance="" DBPort="" />
       </Database>
     </BusinessDataConnectivity>
-    <WordAutomationService Provision="" Name="Word Automation Services" ProxyName="Word Automation Services Proxy">
+    <WordAutomationService Provision="false" Name="Word Automation Services" ProxyName="Word Automation Services Proxy">
       <Database>
         <Name>WordAutomation</Name>
         <DBServer />
         <DBAlias Create="false" DBInstance="" DBPort="" />
       </Database>
     </WordAutomationService>
-    <AppManagementService Provision="" Name="App Management Services" ProxyName="App Management Services Proxy" AppDomain="">
+    <AppManagementService Provision="false" Name="App Management Services" ProxyName="App Management Services Proxy" AppDomain="">
       <Database>
         <Name>AppManagement</Name>
         <DBServer />
         <DBAlias Create="false" DBInstance="" DBPort="" />
       </Database>
     </AppManagementService>
-    <SubscriptionSettingsService Provision="" Name="Subscription Settings Services" AppSiteSubscriptionName="">
+    <SubscriptionSettingsService Provision="false" Name="Subscription Settings Services" AppSiteSubscriptionName="">
       <Database>
         <Name>SubscriptionSettings</Name>
         <DBServer />
         <DBAlias Create="false" DBInstance="" DBPort="" />
       </Database>
     </SubscriptionSettingsService>
-    <WorkManagementService Provision="" Name="Work Management Services" ProxyName="Work Management Services Proxy" />
-    <MachineTranslationService Provision="" Name="Machine Translation Services" ProxyName="Machine Translation Services Proxy">
+    <WorkManagementService Provision="false" Name="Work Management Services" ProxyName="Work Management Services Proxy" />
+    <MachineTranslationService Provision="false" Name="Machine Translation Services" ProxyName="Machine Translation Services Proxy">
       <Database>
         <Name>TranslationService</Name>
         <DBServer />
         <DBAlias Create="false" DBInstance="" DBPort="" />
       </Database>
     </MachineTranslationService>
-    <PowerPointConversionService Provision="" Name="PowerPoint Conversion Services" ProxyName="PowerPoint Conversion Services Proxy" />
+    <PowerPointConversionService Provision="false" Name="PowerPoint Conversion Services" ProxyName="PowerPoint Conversion Services Proxy" />
   </ServiceApps>
   <EnterpriseServiceApps>
-    <ExcelServices Provision="" Name="Excel Services" UnattendedIDUser="" UnattendedIDPassword="" />
-    <VisioService Provision="" Name="Visio Graphics Services" ProxyName="Visio Graphics Services Proxy" UnattendedIDUser="" UnattendedIDPassword="" />
-    <AccessService Provision="" Name="Access 2010 Services" ProxyName="Access 2010 Services Proxy" />
+    <ExcelServices Provision="false" Name="Excel Services" UnattendedIDUser="" UnattendedIDPassword="" />
+    <VisioService Provision="false" Name="Visio Graphics Services" ProxyName="Visio Graphics Services Proxy" UnattendedIDUser="" UnattendedIDPassword="" />
+    <AccessService Provision="false" Name="Access 2010 Services" ProxyName="Access 2010 Services Proxy" />
     <AccessServices Provision="false" Name="Access Services" ProxyName="Access Services Proxy">
       <Database>
         <Name>AccessServices</Name>
@@ -243,7 +243,7 @@
         <DBAlias Create="false" DBInstance="" DBPort="" />
       </Database>
     </AccessServices>
-    <PerformancePointService Provision="" Name="PerformancePoint Services" ProxyName="PerformancePoint Services Proxy" UnattendedIDUser="" UnattendedIDPassword="">
+    <PerformancePointService Provision="false" Name="PerformancePoint Services" ProxyName="PerformancePoint Services Proxy" UnattendedIDUser="" UnattendedIDPassword="">
       <Database>
         <Name>PerformancePoint</Name>
         <DBServer />

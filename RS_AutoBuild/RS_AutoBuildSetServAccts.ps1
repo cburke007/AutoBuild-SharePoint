@@ -246,12 +246,29 @@ $FarmAdminPass = $pass
 $AutoSPXML.Configuration.Install.AutoAdminLogon.Enable = "true"
 $AutoSPXML.Configuration.Install.AutoAdminLogon.Password = "$pass"
 
+if($AutoSPXML.Configuration.Install.SKU -eq "Foundation")
+{    
+    $AutoSPXML.Configuration.Farm.ObjectCacheAccounts.SuperReader = $netbios + "\" + $FarmAdmin
+    
+    $AutoSPXML.Configuration.Farm.ObjectCacheAccounts.SuperUser = $netbios + "\" + $FarmAdmin
+}
+
 # Add SQL Permissions for Farm Admin
 Set-SQLAccess "$netBios\$FarmAdmin" "SysAdmin" $dbServer
             
 $FarmAcct = $AcctPrefix + "SP_Connect"
 if(UserExists $FarmAcct){$pass = Read-Host "User $FarmAcct Exists! Please enter existing Password ";CreateServAcct $FarmAcct "Farm Connect" $pass}
 else{$pass = Get-ComplexPassword; CreateServAcct $FarmAcct "Farm Connect" $pass}
+
+if($AutoSPXML.Configuration.Install.SKU -eq "Foundation")
+{
+    $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'searchservice']")
+    $mgdAcctNode.Username = $netbios + "\" + $FarmAcct
+    $mgdAcctNode.Password = "$pass"
+
+    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Account = $netbios + "\" + $FarmAcct
+    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Password = "$pass"
+}
 
 $AutoSPXML.Configuration.Farm.Account.Username = $netbios + "\" + $FarmAcct
 $AutoSPXML.Configuration.Farm.Account.Password = "$pass"
@@ -276,17 +293,29 @@ $SiteAP = $AcctPrefix + "SP_Site_AP"
 if(UserExists $SiteAP){$pass = Read-Host "User $SiteAP Exists! Please enter existing Password ";CreateServAcct $SiteAP "Default Site AppPool" $pass}
 else{$pass = Get-ComplexPassword; CreateServAcct $SiteAP "Default Site AppPool" $pass}
 
+$mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'portalapppool']")
+$mgdAcctNode.Username = $netbios + "\" + $SiteAP
+$mgdAcctNode.Password = "$pass"
 
+$portalAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "Portal"}
+$portalAppNode.applicationPoolAccount = $netbios + "\" + $SiteAP
+$portalAppNode.SiteCollections.SiteCollection.Owner = $netbios + "\" + $SiteAdmin
+
+if($AutoSPXML.Configuration.Install.SKU -eq "Foundation")
+{
+    $mySiteNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "MySiteHost"}
+	[Void]$mySiteNode.ParentNode.RemoveChild($mySiteNode)
+
+    $mgdAcctNode = $AutoSPXML.Configuration.Farm.ManagedAccounts.ManagedAccount | ?{$_.CommonName -eq "mysiteapppool"}
+	[Void]$mgdAcctNode.ParentNode.RemoveChild($mgdAcctNode)
+
+    $mgdAcctNode = $AutoSPXML.Configuration.Farm.ManagedAccounts.ManagedAccount | ?{$_.CommonName -eq "searchapppool"}
+	[Void]$mgdAcctNode.ParentNode.RemoveChild($mgdAcctNode)
+}
+ 
     
 if($AutoSPXML.Configuration.Install.SKU -eq "Standard" -or $AutoSPXML.Configuration.Install.SKU -eq "Enterprise")
 {
-    $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'portalapppool']")
-    $mgdAcctNode.Username = $netbios + "\" + $SiteAP
-    $mgdAcctNode.Password = "$pass"
-
-    $portalAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "Portal"}
-    $portalAppNode.applicationPoolAccount = $netbios + "\" + $SiteAP
-
     $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'mysiteapppool']")
     $mgdAcctNode.Username = $netbios + "\" + $SiteAP
     $mgdAcctNode.Password = "$pass"
@@ -294,7 +323,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Standard" -or $AutoSPXML.Configurat
     $mySiteAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "MySiteHost"}
     $mySiteAppNode.applicationPoolAccount = $netbios + "\" + $SiteAP
    
-    $portalAppNode.SiteCollections.SiteCollection.Owner = $netbios + "\" + $SiteAdmin
+    
     $mySiteAppNode.SiteCollections.SiteCollection.Owner = $netbios + "\" + $SiteAdmin
     
     $SearchAP = $AcctPrefix + "SP_Search_AP"
@@ -308,7 +337,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Standard" -or $AutoSPXML.Configurat
     $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ApplicationPool.Account = $netbios + "\" + $SearchAP
     $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ApplicationPool.Password = "$pass"
     $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AdminComponent.ApplicationPool.Account = $netbios + "\" + $SearchAP
-            
+    
     $SearchServ = $AcctPrefix + "SP_SearchServ"
     if(UserExists $SearchServ){$pass = Read-Host "User $SearchServ Exists! Please enter existing Password ";CreateServAcct $SearchServ "Search Service" $pass}
     else{$pass = Get-ComplexPassword; CreateServAcct $SearchServ "Search Service" $pass}
@@ -316,10 +345,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Standard" -or $AutoSPXML.Configurat
     $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'searchservice']")
     $mgdAcctNode.Username = $netbios + "\" + $SearchServ
     $mgdAcctNode.Password = "$pass"
-
-    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Account = $netbios + "\" + $SearchServ
-    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Password = "$pass"
-            
+        
     $SearchCrawl = $AcctPrefix + "SP_SearchCrawl"
     if(UserExists $SearchCrawl){$pass = Read-Host "User $SearchCrawl Exists! Please enter existing Password ";CreateServAcct $SearchCrawl "Search Crawl" $pass}
     else{$pass = Get-ComplexPassword; CreateServAcct $SearchCrawl "Search Crawl" $pass}

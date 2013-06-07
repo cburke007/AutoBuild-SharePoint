@@ -73,6 +73,26 @@ function Set-RSPreReqs
         Start-WinService "$serviceToStart"
     }
     Write-Host ""
-
 }
 
+function PrepFoundation
+{
+    param([string]$localPath)
+
+    $xmlInputPath = $localPath + "\" + "AutoSPInstallerInput.xml"
+    $xmlinput = [xml](Get-Content $xmlInputPath)
+    
+    $script:configFile = Join-Path -Path (Get-Item $env:TEMP).FullName -ChildPath $($xmlinput.Configuration.Install.ConfigFile)
+    
+    $configXML = [xml](get-content $configFile )
+
+    $PIDKeyNode = $configXML.SelectSingleNode("//Configuration/PIDKEY")
+	
+    if(-not [string]::IsNullOrEmpty($PIDKeyNode))
+    {
+        Write-Host -ForegroundColor White " - Removing the PIDKEY Node for Foundation Install... "
+        [Void]$PIDKeyNode.ParentNode.RemoveChild($PIDKeyNode)
+        Write-Host -ForegroundColor White " - Writing $($xmlinput.Configuration.Install.ConfigFile) to (Get-Item $env:TEMP).FullName..."
+        $configXML.Save($configFile)
+    } 
+}

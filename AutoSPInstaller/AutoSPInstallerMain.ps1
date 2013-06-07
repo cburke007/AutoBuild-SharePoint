@@ -154,6 +154,8 @@ Function PrepForInstall
     ValidatePassphrase $xmlinput
     CheckConfigFiles $xmlinput
     CheckSQLAccess
+
+    if($xmlinput.Configuration.Install.SKU -eq "Foundation"){PrepFoundation $env:dp0}
 }
 #EndRegion
 
