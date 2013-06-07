@@ -281,12 +281,12 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
                         else{$wfe = $wfe + ", " + $serverName}
 
                         $CurrQueryServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
-                        if($CurrQueryServers -eq "false"){$NewQueryServers = $serverName}
+                        if($CurrQueryServers -eq ""){$NewQueryServers = $serverName}
                         else{$NewQueryServers = $CurrQueryServers + " " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.SetAttribute("Name", $NewQueryServers)
 
                         $CurrSQSSServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.Name
-                        if($CurrSQSSServers -eq "false"){$NewSQSSServers = $serverName}
+                        if($CurrSQSSServers -eq ""){$NewSQSSServers = $serverName}
                         else{$NewSQSSServers = $CurrSQSSServers + " " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.SetAttribute("Name", $NewSQSSServers)
                     
@@ -381,23 +381,25 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
 
                   }
                 3 {
+                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Provision = "true"
+
                         $CurrCrawlServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.CrawlComponent.Server.Name
-                        if($CurrCrawlServers -eq "false"){$NewCrawlServers = $serverName}
+                        if($CurrCrawlServers -eq ""){$NewCrawlServers = $serverName}
                         else{$NewCrawlServers = $CurrCrawlServers + " " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.CrawlComponent.Server.SetAttribute("Name", $NewCrawlServers)
 
                         $CurrIndexServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.IndexComponent.Server.Name
-                        if($CurrIndexServers -eq "false"){$NewIndexServers = $serverName}
+                        if($CurrIndexServers -eq ""){$NewIndexServers = $serverName}
                         else{$NewIndexServers = $CurrIndexServers + " " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.IndexComponent.Server.SetAttribute("Name", $NewIndexServers)
 
                         $CurrContentServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ContentProcessingComponent.Server.Name
-                        if($CurrContentServers -eq "false"){$NewContentServers = $serverName}
+                        if($CurrContentServers -eq ""){$NewContentServers = $serverName}
                         else{$NewContentServers = $CurrContentServers + " " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ContentProcessingComponent.Server.SetAttribute("Name", $NewContentServers)
 
                         $CurrAnalyticsServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AnalyticsProcessingComponent.Server.Name
-                        if($CurrAnalyticsServers -eq "false"){$NewAnalyticsServers = $serverName}
+                        if($CurrAnalyticsServers -eq ""){$NewAnalyticsServers = $serverName}
                         else{$NewAnalyticsServers = $CurrAnalyticsServers + " " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AnalyticsProcessingComponent.Server.SetAttribute("Name", $NewAnalyticsServers)      
                   }

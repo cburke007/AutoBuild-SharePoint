@@ -345,6 +345,9 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Standard" -or $AutoSPXML.Configurat
     $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'searchservice']")
     $mgdAcctNode.Username = $netbios + "\" + $SearchServ
     $mgdAcctNode.Password = "$pass"
+    
+    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Account = $netbios + "\" + $SearchServ
+    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Password = "$pass"
         
     $SearchCrawl = $AcctPrefix + "SP_SearchCrawl"
     if(UserExists $SearchCrawl){$pass = Read-Host "User $SearchCrawl Exists! Please enter existing Password ";CreateServAcct $SearchCrawl "Search Crawl" $pass}
