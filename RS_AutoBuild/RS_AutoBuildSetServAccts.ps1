@@ -230,6 +230,12 @@ $text = "$env:dp0\COREInfo.txt"
 
 $AutoSPXML = [xml](get-content "$env:AutoSPPath\AutoSPInstallerInput.xml" -EA 0)
 
+if([string]::IsNullOrEmpty($AutoSPXML.Configuration.Farm.Database.DBAlias.DBPort))
+{
+    $dbServer = $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance
+}
+else{$dbServer = [string]$AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance + "," + [string]$AutoSPXML.Configuration.Farm.Database.DBAlias.DBPort}
+
 $prefix = $AutoSPXML.Configuration.Farm.Database.DBPrefix
 if($prefix -eq $null -or $prefix -eq "")
 {

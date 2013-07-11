@@ -13,7 +13,7 @@ function Start-WinService
     { 
         Write-Host -ForegroundColor Cyan " - Starting $serviceName..."
         Set-Service $service -startuptype automatic
-        Start-WinService $service        
+        Start-Service $service        
                
         ## Wait
 		Write-Host -ForegroundColor Cyan " - Waiting for $serviceName to start" -NoNewline
@@ -65,7 +65,7 @@ function Set-RSPreReqs
 
     Write-Host -Foreground Yellow "Checking Status of Windows Services Pre-Requisites..."
     # Ensure necessary Windows Services are started
-    $servicesToStart = "W3SVC", "IISADMIN"
+    $servicesToStart = "W3SVC", "IISADMIN", "RemoteRegistry"
 
     # Make sure necessary windows services are started and set to Automatic
     foreach ($serviceToStart in $servicesToStart)
