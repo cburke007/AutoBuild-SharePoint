@@ -137,26 +137,19 @@
         <EnterpriseSearchServiceApplication Name="Search Service Application" DatabaseServer="" DatabaseName="Search" FailoverDatabaseServer="" Partitioned="false" Partitions="1" SearchServiceApplicationType="Regular" ContentAccessAccount="" ContentAccessAccountPassword="">
           <ApplicationPool Name="SharePoint Search Application Pool" Account="DOMAIN\SP_SearchService" Password="" />
           <CrawlComponent>
-            <Server Name="" />
           </CrawlComponent>
           <QueryComponent>
-            <Server Name="" />
           </QueryComponent>
           <SearchQueryAndSiteSettingsServers>
-            <Server Name="" />
           </SearchQueryAndSiteSettingsServers>
           <AdminComponent>
-            <Server Name="" />
             <ApplicationPool Name="SharePoint Search Application Pool" Account="DOMAIN\SP_SearchService" />
           </AdminComponent>
           <IndexComponent>
-            <Server Name="" />
           </IndexComponent>
           <ContentProcessingComponent>
-            <Server Name="" />
           </ContentProcessingComponent>
           <AnalyticsProcessingComponent>
-            <Server Name="" />
           </AnalyticsProcessingComponent>
           <Proxy Name="Search Service Application Proxy" Partitioned="false">
             <ProxyGroup Name="Default" />

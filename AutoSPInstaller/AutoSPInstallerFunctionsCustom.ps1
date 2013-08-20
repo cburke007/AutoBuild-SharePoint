@@ -12,7 +12,7 @@ function Start-WinService
     if($service.Status -ne "Running")
     { 
         Write-Host -ForegroundColor Cyan " - Starting $serviceName..."
-        Set-Service $service -startuptype automatic
+        Set-Service $serviceName -startuptype automatic
         Start-Service $service        
                
         ## Wait

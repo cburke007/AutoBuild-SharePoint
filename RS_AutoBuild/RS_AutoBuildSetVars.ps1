@@ -187,16 +187,14 @@ if($Edition -eq "Foundation")
                         if($wfe -eq ""){$wfe = $serverName}
                         else{$wfe = $wfe + ", " + $serverName}
 
-                        $CurrQueryServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
-                        if($CurrQueryServers -eq "false"){$NewQueryServers = $serverName}
-                        else{$NewQueryServers = $CurrQueryServers + " " + $serverName}
-                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.SetAttribute("Name", $NewQueryServers)
+                        $entSearch = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication
+                        $newQueryServerNode = $AutoSPXML.CreateElement("Server")
+                        $newQueryServerNode.SetAttribute("Name",$serverName)
+                        $entSearch["QueryComponent"].AppendChild($newQueryServerNode) | Out-Null
 
-                        $CurrSQSSServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.Name
-                        if($CurrSQSSServers -eq "false"){$NewSQSSServers = $serverName}
-                        else{$NewSQSSServers = $CurrSQSSServers + " " + $serverName}
-                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.SetAttribute("Name", $NewSQSSServers)
-                    
+                        $newSQSSServerNode = $AutoSPXML.CreateElement("Server")
+                        $newSQSSServerNode.SetAttribute("Name",$serverName)
+                        $entSearch["SearchQueryAndSiteSettingsServers"].AppendChild($newSQSSServerNode) | Out-Null
                   }
                 2 {
                         if($apps -eq ""){$apps = $serverName}
@@ -231,13 +229,22 @@ if($Edition -eq "Foundation")
                   }
                 
                 3 {
-					    $FarmDBServerAlias = Read-Host "Enter an Alias for the SQL Server $serverName (Blank/Default = SharePointSQL) "
+					    $customInstanceName = Read-Host "Enter the custom SQL Instance (Leave blank for Default Instance) "
+                        $customSQLPort = Read-Host "Enter the custom SQL Port (Leave blank for Default Port) "
+                        $FarmDBServerAlias = Read-Host "Enter an Alias for the SQL Server $serverName (Blank/Default = SharePointSQL) "
+                       
 					    if([string]::IsNullOrEmpty($FarmDBServerAlias))
 					    {
 						    $FarmDBServerAlias = "SharePointSQL"
 					    }
+                        if(-not [string]::IsNullOrEmpty($customInstanceName))
+                        {
+                            $DBServerInstance = $serverName + "\" + $customInstanceName
+                        }
+
 					    $AutoSPXML.Configuration.Farm.Database.DBAlias.Create = "true"
-                        $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance = "$serverName"
+                        $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance = "$DBServerInstance"
+                        $AutoSPXML.Configuration.Farm.Database.DBAlias.DBPort = "$customSQLPort"
 
                         $AutoSPXML.Configuration.Farm.Database.DBServer = "$FarmDBServerAlias"
                   } 
@@ -280,16 +287,14 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
                         if($wfe -eq ""){$wfe = $serverName}
                         else{$wfe = $wfe + ", " + $serverName}
 
-                        $CurrQueryServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
-                        if($CurrQueryServers -eq ""){$NewQueryServers = $serverName}
-                        else{$NewQueryServers = $CurrQueryServers + " " + $serverName}
-                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.SetAttribute("Name", $NewQueryServers)
+                        $entSearch = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication
+                        $newQueryServerNode = $AutoSPXML.CreateElement("Server")
+                        $newQueryServerNode.SetAttribute("Name",$serverName)
+                        $entSearch["QueryComponent"].AppendChild($newQueryServerNode) | Out-Null
 
-                        $CurrSQSSServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.Name
-                        if($CurrSQSSServers -eq ""){$NewSQSSServers = $serverName}
-                        else{$NewSQSSServers = $CurrSQSSServers + " " + $serverName}
-                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.SearchQueryAndSiteSettingsServers.Server.SetAttribute("Name", $NewSQSSServers)
-                    
+                        $newSQSSServerNode = $AutoSPXML.CreateElement("Server")
+                        $newSQSSServerNode.SetAttribute("Name",$serverName)
+                        $entSearch["SearchQueryAndSiteSettingsServers"].AppendChild($newSQSSServerNode) | Out-Null
                   }
                 2 {
                         if($apps -eq ""){$apps = $serverName}
@@ -383,35 +388,42 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
                 3 {
                         $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Provision = "true"
 
-                        $CurrCrawlServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.CrawlComponent.Server.Name
-                        if($CurrCrawlServers -eq ""){$NewCrawlServers = $serverName}
-                        else{$NewCrawlServers = $CurrCrawlServers + " " + $serverName}
-                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.CrawlComponent.Server.SetAttribute("Name", $NewCrawlServers)
+                        $entSearch = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication
+                        $newCrawlServerNode = $AutoSPXML.CreateElement("Server")
+                        $newCrawlServerNode.SetAttribute("Name",$serverName)
+                        $entSearch["CrawlComponent"].AppendChild($newCrawlServerNode) | Out-Null
 
-                        $CurrIndexServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.IndexComponent.Server.Name
-                        if($CurrIndexServers -eq ""){$NewIndexServers = $serverName}
-                        else{$NewIndexServers = $CurrIndexServers + " " + $serverName}
-                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.IndexComponent.Server.SetAttribute("Name", $NewIndexServers)
+                        $newIndexServerNode = $AutoSPXML.CreateElement("Server")
+                        $newIndexServerNode.SetAttribute("Name",$serverName)
+                        $entSearch["IndexComponent"].AppendChild($newIndexServerNode) | Out-Null
 
-                        $CurrContentServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ContentProcessingComponent.Server.Name
-                        if($CurrContentServers -eq ""){$NewContentServers = $serverName}
-                        else{$NewContentServers = $CurrContentServers + " " + $serverName}
-                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ContentProcessingComponent.Server.SetAttribute("Name", $NewContentServers)
-
-                        $CurrAnalyticsServers = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AnalyticsProcessingComponent.Server.Name
-                        if($CurrAnalyticsServers -eq ""){$NewAnalyticsServers = $serverName}
-                        else{$NewAnalyticsServers = $CurrAnalyticsServers + " " + $serverName}
-                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AnalyticsProcessingComponent.Server.SetAttribute("Name", $NewAnalyticsServers)      
-                  }
+                        $newcontentServerNode = $AutoSPXML.CreateElement("Server")
+                        $newcontentServerNode.SetAttribute("Name",$serverName)
+                        $entSearch["ContentProcessingComponent"].AppendChild($newcontentServerNode) | Out-Null
+                        
+                        $newAnalyticsServerNode = $AutoSPXML.CreateElement("Server")
+                        $newAnalyticsServerNode.SetAttribute("Name",$serverName)
+                        $entSearch["AnalyticsProcessingComponent"].AppendChild($newAnalyticsServerNode) | Out-Null
+                        
+                }
 
                 4 {
-					    $FarmDBServerAlias = Read-Host "Enter an Alias for the SQL Server $serverName (Blank/Default = SharePointSQL) "
+					    $customInstanceName = Read-Host "Enter the custom SQL Instance (Leave blank for Default Instance) "
+                        $customSQLPort = Read-Host "Enter the custom SQL Port (Leave blank for Default Port) "
+                        $FarmDBServerAlias = Read-Host "Enter an Alias for the SQL Server $serverName (Blank/Default = SharePointSQL) "
+                        
 					    if([string]::IsNullOrEmpty($FarmDBServerAlias))
 					    {
 						    $FarmDBServerAlias = "SharePointSQL"
 					    }
+                        if(-not [string]::IsNullOrEmpty($customInstanceName))
+                        {
+                            $DBServerInstance = $serverName + "\" + $customInstanceName
+                        }
+
 					    $AutoSPXML.Configuration.Farm.Database.DBAlias.Create = "true"
-                        $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance = "$serverName"
+                        $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance = "$DBServerInstance"
+                        $AutoSPXML.Configuration.Farm.Database.DBAlias.DBPort = "$customSQLPort"
 
                         $AutoSPXML.Configuration.Farm.Database.DBServer = "$FarmDBServerAlias"
                   } 
@@ -419,7 +431,10 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
                         $AutoSPXML.Configuration.Farm.CentralAdmin.SetAttribute("Provision", $serverName)
                   } 
                 6 {
-                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AdminComponent.Server.SetAttribute("Name", $serverName)
+                        $entSearch = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication
+                        $newAdminServerNode = $AutoSPXML.CreateElement("Server")
+                        $newAdminServerNode.SetAttribute("Name",$serverName)
+                        $entSearch["AdminComponent"].AppendChild($newAdminServerNode) | Out-Null
                   } 
                 7 {
                         $AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SetAttribute("Provision", $serverName)
