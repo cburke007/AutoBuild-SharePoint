@@ -241,6 +241,7 @@ if($Edition -eq "Foundation")
                         {
                             $DBServerInstance = $serverName + "\" + $customInstanceName
                         }
+                        else{$DBServerInstance = $serverName}
 
 					    $AutoSPXML.Configuration.Farm.Database.DBAlias.Create = "true"
                         $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance = "$DBServerInstance"
@@ -420,6 +421,7 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
                         {
                             $DBServerInstance = $serverName + "\" + $customInstanceName
                         }
+                        else{$DBServerInstance = $serverName}
 
 					    $AutoSPXML.Configuration.Farm.Database.DBAlias.Create = "true"
                         $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance = "$DBServerInstance"
