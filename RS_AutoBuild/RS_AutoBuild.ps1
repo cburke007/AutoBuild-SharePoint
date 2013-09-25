@@ -66,7 +66,10 @@ switch($VerChoice)
         else{Write-Host "Exiting..."}
     }
     3 {Write-Host "Exiting..."; break}
-    default {$Version = "2010"}
+    default {
+                # Execute AutoSPInstaller Script
+                Start-Process -wait "$env:AutoSPPath\AutoSPInstallerLaunch.bat"
+    }
 }
 
 Write-Host ""
