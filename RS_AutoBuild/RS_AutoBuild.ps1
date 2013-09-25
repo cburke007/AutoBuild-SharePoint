@@ -38,16 +38,37 @@ if ($AutoSPXML -eq $null)
     ./RS_AutoBuildSetServAccts.ps1
 }
 
-# Validate Config through GUI
-Start-Process -wait "$env:AutoSPPath\AutoSPInstallerGUI" "$env:AutoSPPath\AutoSPInstallerInput.xml"
+#Choose the edition of SharePoint you are installing
+Write-Host -ForegroundColor Yellow "How would you like to proceed?"
+Write-Host -ForegroundColor Cyan "1. Continue with Build process"
+Write-Host -ForegroundColor Cyan "2. Launch AutoSPInstaller GUI"
+Write-Host -ForegroundColor Cyan "3. Exit Build Process"
+Write-Host -ForegroundColor Cyan " "
+$VerChoice = Read-Host "Select 1-3 (Default is 1): "
+
+switch($VerChoice)
+{
+    1 {
+        # Execute AutoSPInstaller Script
+        Start-Process -wait "$env:AutoSPPath\AutoSPInstallerLaunch.bat"
+    }
+    2 {
+        # Validate Config through GUI
+        Start-Process -wait "$env:AutoSPPath\AutoSPInstallerGUI" "$env:AutoSPPath\AutoSPInstallerInput.xml"
+
+        $launch = Read-Host "Continue with build process? ([Y] or N) "
+
+        if($launch -eq "Y" -or $launch -eq "y")
+        {
+            # Execute AutoSPInstaller Script
+            Start-Process -wait "$env:AutoSPPath\AutoSPInstallerLaunch.bat"
+        }
+        else{Write-Host "Exiting..."}
+    }
+    3 {Write-Host "Exiting..."; break}
+    default {$Version = "2010"}
+}
+
+Write-Host ""
 
 Write-Host -ForegroundColor Red "AutoSPInstaller Prep Complete!"
-
-$launch = Read-Host "Automatically launch AutoSPInstaller? "
-
-if($launch -eq "Y" -or $launch -eq "y")
-{
-    # Execute AutoSPInstaller Script
-    Start-Process -wait "$env:AutoSPPath\AutoSPInstallerLaunch.bat"
-}
-else{Write-Host "Done!"}

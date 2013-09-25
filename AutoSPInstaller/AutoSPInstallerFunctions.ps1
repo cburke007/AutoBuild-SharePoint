@@ -12,8 +12,8 @@ Function ValidatePassphrase([xml]$xmlinput)
         Return
     }
     $groups=0
-    If ($farmPassphrase -match "[a-z]") { $groups = $groups + 1 }
-    If ($farmPassphrase -match "[A-Z]") { $groups = $groups + 1 }
+    If ($farmPassphrase -cmatch "[a-z]") { $groups = $groups + 1 }
+    If ($farmPassphrase -cmatch "[A-Z]") { $groups = $groups + 1 }
     If ($farmPassphrase -match "[0-9]") { $groups = $groups + 1 }
     If ($farmPassphrase -match "[^a-zA-Z0-9]") { $groups = $groups + 1 }
 
@@ -40,23 +40,25 @@ Function ValidateCredentials([xml]$xmlinput)
         Throw " - You are running this script under a local machine user account. You must be a domain user"
     }
 
-    ForEach($node in $xmlinput.SelectNodes("//*[@Password]|//*[@password]|//*[@ContentAccessAccountPassword]|//*[@UnattendedIDPassword]|//*[Password]|//*[password]|//*[ContentAccessAccountPassword]|//*[UnattendedIDPassword]"))
+    ForEach($node in $xmlinput.SelectNodes("//*[@Password]|//*[@password]|//*[@ContentAccessAccountPassword]|//*[@UnattendedIDPassword]|//*[@SyncConnectionAccountPassword]|//*[Password]|//*[password]|//*[ContentAccessAccountPassword]|//*[UnattendedIDPassword]|//*[SyncConnectionAccountPassword]"))
     {
         $user = (GetFromNode $node "username")
         If ($user -eq "") { $user = (GetFromNode $node "Username") }
         If ($user -eq "") { $user = (GetFromNode $node "Account") }
         If ($user -eq "") { $user = (GetFromNode $node "ContentAccessAccount") }
         If ($user -eq "") { $user = (GetFromNode $node "UnattendedIDUser") }
+        If ($user -eq "") { $user = (GetFromNode $node "SyncConnectionAccount") }
 
         $password = (GetFromNode $node "password")
         If ($password -eq "") { $password = (GetFromNode $node "Password") }
         If ($password -eq "") { $password = (GetFromNode $node "ContentAccessAccountPassword") }
         If ($password -eq "") { $password = (GetFromNode $node "UnattendedIDPassword") }
+        If ($password -eq "") { $password = (GetFromNode $node "SyncConnectionAccountPassword") }
 
         If (($password -ne "") -and ($user -ne ""))
         {
             $currentDomain = "LDAP://" + ([ADSI]"").distinguishedName
-            Write-Host -ForegroundColor White " - Account `"$user`"..." -NoNewline
+            Write-Host -ForegroundColor White " - Account `"$user`" ($($node.Name))..." -NoNewline
             $dom = New-Object System.DirectoryServices.DirectoryEntry($currentDomain,$user,$password)
             If ($dom.Path -eq $null)
             {
@@ -69,7 +71,38 @@ Function ValidateCredentials([xml]$xmlinput)
             }
         }
     }
-        If ($acctInvalid) {Throw " - At least one set of credentials is invalid.`n - Check usernames and passwords in each place they are used."}
+    if ($xmlinput.Configuration.WebApplications)
+    {
+        # Get application pool accounts
+        foreach ($webApp in $($xmlinput.Configuration.WebApplications.WebApplication))
+        {
+            $appPoolAccounts = @($appPoolAccounts+$webApp.applicationPoolAccount)
+            # Get site collection owners #
+            foreach ($siteCollection in $($webApp.SiteCollections.SiteCollection))
+            {
+                $siteCollectionOwners = @($siteCollectionOwners+$siteCollection.Owner)
+            }
+        }
+    }
+    $appPoolAccounts = $appPoolAccounts | Select-Object -Unique
+    $siteCollectionOwners = $siteCollectionOwners | Select-Object -Unique
+    # Check for the existence of object cache accounts and other ones for which we don't need to specify passwords
+    $accountsToCheck = @($xmlinput.Configuration.Farm.ObjectCacheAccounts.SuperUser,$xmlinput.Configuration.Farm.ObjectCacheAccounts.SuperReader)+$appPoolAccounts+$siteCollectionOwners | Select-Object -Unique
+    foreach ($account in $accountsToCheck)
+    {
+        $domain,$accountName = $account -split "\\"
+        Write-Host -ForegroundColor White " - Account `"$account`"..." -NoNewline
+        if (!(userExists $accountName))
+        {
+            Write-Host -BackgroundColor Red -ForegroundColor Black "Invalid!"
+            $acctInvalid = $true
+        }
+        else
+        {
+            Write-Host -ForegroundColor Black -BackgroundColor Green "Verified."
+        }
+    }
+    If ($acctInvalid) {Throw " - At least one set of credentials is invalid.`n - Check usernames and passwords in each place they are used."}
     WriteLine
 }
 #EndRegion
@@ -239,7 +272,7 @@ Function CheckConfigFiles([xml]$xmlinput)
 </Configuration>
 "@
         $script:configFile = Join-Path -Path (Get-Item $env:TEMP).FullName -ChildPath $($xmlinput.Configuration.Install.ConfigFile)
-        Write-Host -ForegroundColor White " - Writing $($xmlinput.Configuration.Install.ConfigFile) to (Get-Item $env:TEMP).FullName..."
+        Write-Host -ForegroundColor White " - Writing $($xmlinput.Configuration.Install.ConfigFile) to $((Get-Item $env:TEMP).FullName)..."
         Set-Content -Path "$configFile" -Force -Value $xmlConfig
     }
     #EndRegion
@@ -286,7 +319,7 @@ Function CheckConfigFiles([xml]$xmlinput)
     #EndRegion
 
     #Region ForeFront answer file
-    if (ShouldIProvision($xmlinput.Configuration.ForeFront) -eq $true)
+    if (ShouldIProvision $xmlinput.Configuration.ForeFront -eq $true)
     {
         if (Test-Path -Path (Join-Path -Path $env:dp0 -ChildPath $($xmlinput.Configuration.ForeFront.ConfigFile)))
         {
@@ -480,7 +513,7 @@ Function InstallPrerequisites([xml]$xmlinput)
         Try
         {
 			# Install prerequisites manually without using PrerequisiteInstaller if we're installing SP2010 on on Windows Server 2012
-            if (((Get-WmiObject Win32_OperatingSystem).Version -like "6.2*") -and ($env:spVer -eq "14"))
+            if (((Get-WmiObject Win32_OperatingSystem).Version -like "6.2*" -or (Get-WmiObject Win32_OperatingSystem).Version -like "6.3*") -and ($env:spVer -eq "14"))
             {
 			    Throw " - SharePoint 2010 is officially unsupported on Windows Server 2012 - see http://support.microsoft.com/kb/2724471"
 			}
@@ -514,7 +547,7 @@ Function InstallPrerequisites([xml]$xmlinput)
                     }
                     ElseIf ($env:spVer -eq "15") #SP2013
                     {
-                        if ((Get-WmiObject Win32_OperatingSystem).Version -like "6.2*") # Try to pre-install .Net Framework 3.5.1 on Windows Server 2012
+                        if ((Get-WmiObject Win32_OperatingSystem).Version -like "6.2*" -or (Get-WmiObject Win32_OperatingSystem).Version -like "6.3*") # Try to pre-install .Net Framework 3.5.1 on Windows Server 2012
                         {
                             if (Test-Path -Path "$env:SPbits\PrerequisiteInstallerFiles\sxs")
                             {
@@ -580,6 +613,7 @@ Function InstallPrerequisites([xml]$xmlinput)
                 {
                     $missingHotfixes = @{"Windows8-RT-KB2765317-x64.msu" = "http://download.microsoft.com/download/0/2/E/02E9E569-5462-48EB-AF57-8DCCF852E6F4/Windows8-RT-KB2765317-x64.msu"}
                 }
+                else {} # Reserved for Win2012 R2
                 $hotfixLocation = $env:SPbits+"\PrerequisiteInstallerFiles"
                 ForEach ($hotfixPatch in $missingHotfixes.Keys)
                 {
@@ -705,6 +739,11 @@ Function InstallPrerequisites([xml]$xmlinput)
                 {
                     Write-Host -ForegroundColor White " - A pending restart blocks the installation."
                     $preReqKnownIssueRestart = $true
+                }
+                ElseIf ($preReqLog | Select-String -SimpleMatch -Pattern "Error: This tool supports Windows Server version 6.1 and version 6.2" -Encoding Unicode)
+                {
+                    Write-Host -ForegroundColor White " - A known issue occurred (due to Win2012 R2), continuing."
+                    ##$preReqKnownIssueRestart = $true
                 }
                 Else
                 {
@@ -1011,12 +1050,12 @@ Function InstallLanguagePacks([xml]$xmlinput)
 }
 #EndRegion
 
-#Region Install Cumulative Update(s)
+#Region Install Update(s)
 # ===================================================================================
-# Func: Install Cumulative Updates
-# Desc: Install SharePoint Cumulative Updates (CUs) to work around slipstreaming issues
+# Func: InstallUpdates
+# Desc: Install SharePoint Updates (CUs and Service Packs) to work around slipstreaming issues
 # ===================================================================================
-Function InstallCumulativeUpdates
+Function InstallUpdates
 {
     WriteLine
     Write-Host -ForegroundColor White " - Looking for SharePoint updates to install..."
@@ -1027,7 +1066,7 @@ Function InstallCumulativeUpdates
                                   "17302" = "Error: Applying patch";
                                   "17303" = "Error: Extracting file";
                                   "17021" = "Error: Creating temp folder";
-                                  "17022" = "Success: Reboot flag set"; 
+                                  "17022" = "Success: Reboot flag set";
                                   "17023" = "Error: User cancelled installation";
                                   "17024" = "Error: Creating folder failed";
                                   "17025" = "Patch already installed";
@@ -1040,51 +1079,107 @@ Function InstallCumulativeUpdates
                                   "17034" = "Error: Required patch does not apply to the machine";
                                   "17038" = "You do not have sufficient privileges to complete this installation for all users of the machine. Log on as administrator and then retry this installation";
                                   "17044" = "Installer was unable to run detection for this package"}
-    $marchPublicUpdate = Get-ChildItem "$bits\$spYear\Updates" -Name -Include "ubersrvsp2013-kb2767999-fullfile-x64-glb.exe" -ErrorAction SilentlyContinue
-    If ($marchPublicUpdate)
+    if ($spYear -eq "2010")
     {
-        Write-Host -ForegroundColor Blue "  - Installing $spYear March 2013 Public Update $marchPublicUpdate..." -NoNewline
-        $startTime = Get-Date
-        Start-Process -FilePath "$bits\$spYear\Updates\$marchPublicUpdate" -ArgumentList "/passive /norestart"
-        Show-Progress -Process $($marchPublicUpdate -replace ".exe", "") -Color Blue -Interval 5
-        $delta,$null = (New-TimeSpan -Start $startTime -End (Get-Date)).ToString() -split "\."
-        Write-Host -ForegroundColor White "  - March Public Update install completed in $delta."
+        $sp2010SP1 = Get-ChildItem "$bits\$spYear\Updates" -Name -Include "officeserver2010sp1-kb2460045-x64-fullfile-en-us.exe" -ErrorAction SilentlyContinue
+        ##$sp2010June2012CU = Get-ChildItem "$bits\$spYear\Updates" -Name -Include "office2010-kb2598354-fullfile-x64-glb.exe" -ErrorAction SilentlyContinue
+        $sp2010June2013CU = Get-ChildItem "$bits\$spYear\Updates" -Name -Include "ubersrv2010-kb2817527-fullfile-x64-glb.exe" -ErrorAction SilentlyContinue
+        $sp2010SP2 = Get-ChildItem "$bits\$spYear\Updates" -Name -Include "oserversp2010-kb2687453-fullfile-x64-en-us.exe" -ErrorAction SilentlyContinue
+        # First & foremost, install SP2 if it's there
+        if ($sp2010SP2)
+        {
+            InstallSpecifiedUpdate $sp2010SP2 "Service Pack 2"
+            # Now install any language pack service packs that are found, using the naming convention for SP2
+            $sp2010LPServicePacks = Get-ChildItem "$bits\$spYear\Updates" -Name -Include oslpksp2010*.exe -ErrorAction SilentlyContinue | Sort-Object -Descending
+            foreach ($sp2010LPServicePack in $sp2010LPServicePacks)
+            {
+                InstallSpecifiedUpdate $sp2010LPServicePack ""
+            }
+        }
+        # Otherwise, install SP1 as it is a required baseline for any post-June 2012 CUs
+        elseif ($sp2010SP1)
+        {
+            InstallSpecifiedUpdate $sp2010SP1 "Service Pack 1"
+##          if ($sp2010June2012CU)
+##          {
+##              InstallSpecifiedUpdate $sp2010June2012CU "June 2012 CU"
+##          }
+            # Now install any language pack service packs that are found, using the naming convention for SP1
+            $sp2010LPServicePacks = Get-ChildItem "$bits\$spYear\Updates" -Name -Include serverlanguagepack2010sp*.exe -ErrorAction SilentlyContinue | Sort-Object -Descending
+            foreach ($sp2010LPServicePack in $sp2010LPServicePacks)
+            {
+                InstallSpecifiedUpdate $sp2010LPServicePack "Language Pack Service Pack"
+            }
+            # Next, install the June 2013 CU if it's found in \Updates
+            if ($sp2010June2013CU)
+            {
+                InstallSpecifiedUpdate $sp2010June2013CU "June 2013 CU"
+            }
+        }
+        if ($xmlinput.Configuration.OfficeWebApps.Install -eq $true)
+        {
+            $sp2010OWAUpdates = Get-ChildItem "$bits\$spYear\Updates" -Name -Include wac*.exe -ErrorAction SilentlyContinue | Sort-Object -Descending
+            foreach ($sp2010OWAUpdate in $sp2010OWAUpdates)
+            {
+                InstallSpecifiedUpdate $sp2010OWAUpdate "Office Web Apps Update"
+            }
+            
+        }
     }
-    $cumulativeUpdates = Get-ChildItem "$bits\$spYear\Updates" -Name -Include office2010*.exe,ubersrv*.exe -ErrorAction SilentlyContinue | Where-Object {$_ -ne "ubersrvsp2013-kb2767999-fullfile-x64-glb.exe"} | Sort-Object -Descending
+    if ($spYear -eq "2013")
+    {
+        $marchPublicUpdate = Get-ChildItem "$bits\$spYear\Updates" -Name -Include "ubersrvsp2013-kb2767999-fullfile-x64-glb.exe" -ErrorAction SilentlyContinue
+        if ($marchPublicUpdate)
+        {
+            InstallSpecifiedUpdate $marchPublicUpdate "March 2013 Public Update"
+        }
+    }
+    # Get all CUs except the March 2013 PU for SharePoint 2013
+    $cumulativeUpdates = Get-ChildItem "$bits\$spYear\Updates" -Name -Include office2010*.exe,ubersrv*.exe,ubersts*.exe -ErrorAction SilentlyContinue | Where-Object {$_ -ne "ubersrvsp2013-kb2767999-fullfile-x64-glb.exe"} | Sort-Object -Descending
     # Look for Server Cumulative Update installers
-    If ($cumulativeUpdates)
+    if ($cumulativeUpdates)
     {
         if ($spYear -eq "2013" -and !$marchPublicUpdate)
         {
-            Write-Warning "Updates were found in $bits\$spYear\Updates, but the March SP2013 Public Update is missing and needs to be installed first."
+            Write-Host -ForegroundColor Yellow "  - Note: the March 2013 PU package wasn't found in ..\$spYear\Updates; it may need to be installed first if it wasn't slipstreamed."
         }
-        else
+        # Now attempt to install any other CUs found in the \Updates folder
+        Write-Host -ForegroundColor White "  - Installing SharePoint Cumulative Updates:"
+        ForEach ($cumulativeUpdate in $cumulativeUpdates)
         {
-            Write-Host -ForegroundColor White "  - Installing SharePoint Cumulative Updates:"
-            ForEach ($cumulativeUpdate in $cumulativeUpdates)
+            Write-Host -ForegroundColor Blue "   - Installing $cumulativeUpdate..." -NoNewline
+            $startTime = Get-Date
+            Start-Process -FilePath "$bits\$spYear\Updates\$cumulativeUpdate" -ArgumentList "/passive /norestart"
+            Show-Progress -Process $($cumulativeUpdate -replace ".exe", "") -Color Blue -Interval 5
+            $delta,$null = (New-TimeSpan -Start $startTime -End (Get-Date)).ToString() -split "\."
+            $oPatchInstallLog = Get-ChildItem -Path (Get-Item $env:TEMP).FullName | ? {$_.Name -like "opatchinstall*.log"} | Sort-Object -Descending -Property "LastWriteTime" | Select-Object -first 1
+            # Get install result from log
+            $oPatchInstallResultMessage = $oPatchInstallLog | Select-String -SimpleMatch -Pattern "OPatchInstall: Property 'SYS.PROC.RESULT' value" | Select-Object -Last 1
+            If (!($oPatchInstallResultMessage -like "*value '0'*")) # Anything other than 0 means unsuccessful but that's not necessarily a bad thing
             {
-                Write-Host -ForegroundColor Blue "   - Installing $cumulativeUpdate..." -NoNewline
-                $startTime = Get-Date
-                Start-Process -FilePath "$bits\$spYear\Updates\$cumulativeUpdate" -ArgumentList "/passive /norestart"
-                Show-Progress -Process $($cumulativeUpdate -replace ".exe", "") -Color Blue -Interval 5
-                $delta,$null = (New-TimeSpan -Start $startTime -End (Get-Date)).ToString() -split "\."
-                $oPatchInstallLog = Get-ChildItem -Path (Get-Item $env:TEMP).FullName | ? {$_.Name -like "opatchinstall*.log"} | Sort-Object -Descending -Property "LastWriteTime" | Select-Object -first 1
-                # Get install result from log
-                $oPatchInstallResultMessage = $oPatchInstallLog | Select-String -SimpleMatch -Pattern "OPatchInstall: Property 'SYS.PROC.RESULT' value" | Select-Object -Last 1
-                If (!($oPatchInstallResultMessage -like "*value '0'*")) # Anything other than 0 means unsuccessful but that's not necessarily a bad thing
+                $null,$oPatchInstallResultCode = $oPatchInstallResultMessage.Line -split "OPatchInstall: Property 'SYS.PROC.RESULT' value '"
+                $oPatchInstallResultCode = $oPatchInstallResultCode.TrimEnd("'")
+                # OPatchInstall: Property 'SYS.PROC.RESULT' value '17028' means the patch was not needed or installed product was newer
+                if ($oPatchInstallResultCode -eq "17028") {Write-Host -ForegroundColor White "   - Patch not required; installed product is same or newer."}
+                elseif ($oPatchInstallResultCode -eq "17031")
                 {
-                    $null,$oPatchInstallResultCode = $oPatchInstallResultMessage.Line -split "OPatchInstall: Property 'SYS.PROC.RESULT' value '"
-                    $oPatchInstallResultCode = $oPatchInstallResultCode.TrimEnd("'")
-                    ## OPatchInstall: Property 'SYS.PROC.RESULT' value '17028' means the patch was not needed or installed product was newer
-                    if ($oPatchInstallResultCode -eq "17028") {Write-Host -ForegroundColor White "   - Patch not required; installed product is newer."}
-                    else {Write-Host " - $($oPatchInstallResultCodes.$oPatchInstallResultCode)"}
+                    Write-Warning "Error 17031: Detection: Invalid baseline"
+                    Write-Warning "A baseline patch (e.g. March 2013 PU for SP2013, SP1 for SP2010) is missing!"
+                    Write-Host -ForegroundColor Yellow "   - Either slipstream the missing patch first, or include the patch package in the ..\$spYear\Updates folder."
+                    Pause "continue"
                 }
-                Write-Host -ForegroundColor White "   - $cumulativeUpdate install completed in $delta."
+                else {Write-Host "   - $($oPatchInstallResultCodes.$oPatchInstallResultCode)"}
             }
-            Write-Host -ForegroundColor White "  - Cumulative Update installation complete."
+            Write-Host -ForegroundColor White "   - $cumulativeUpdate install completed in $delta."
         }
+        Write-Host -ForegroundColor White "  - Cumulative Update installation complete."
     }
-    if (!$marchPublicUpdate -and !$cumulativeUpdates) 
+    # Finally, install SP2 last in case we applied the June 2013 CU which would not have properly detected SP2...
+    if ($sp2010SP2 -and $sp2010June2013CU -and $spYear -eq "2010")
+    {
+        InstallSpecifiedUpdate $sp2010SP2 "Service Pack 2"
+    }
+    if (!$marchPublicUpdate -and !$cumulativeUpdates)
     {
         Write-Host -ForegroundColor White " - No updates found in $bits\$spYear\Updates, skipping."
     }
@@ -1093,6 +1188,37 @@ Function InstallCumulativeUpdates
         Write-Host -ForegroundColor White " - Finished installing SharePoint updates."
     }
     WriteLine
+}
+# ===================================================================================
+# Func: InstallSpecifiedUpdate
+# Desc: Installs a specified SharePoint Updates (CU or Service Pack)
+# ===================================================================================
+Function InstallSpecifiedUpdate ($updateFile, $updateName)
+{
+    Write-Host -ForegroundColor Blue "  - Installing SP$spYear $updateName $updateFile..." -NoNewline
+    $startTime = Get-Date
+    Start-Process -FilePath "$bits\$spYear\Updates\$updateFile" -ArgumentList "/passive /norestart"
+    Show-Progress -Process $($updateFile -replace ".exe", "") -Color Blue -Interval 5
+    $delta,$null = (New-TimeSpan -Start $startTime -End (Get-Date)).ToString() -split "\."
+    $oPatchInstallLog = Get-ChildItem -Path (Get-Item $env:TEMP).FullName | ? {$_.Name -like "opatchinstall*.log"} | Sort-Object -Descending -Property "LastWriteTime" | Select-Object -first 1
+    # Get install result from log
+    $oPatchInstallResultMessage = $oPatchInstallLog | Select-String -SimpleMatch -Pattern "OPatchInstall: Property 'SYS.PROC.RESULT' value" | Select-Object -Last 1
+    If (!($oPatchInstallResultMessage -like "*value '0'*")) # Anything other than 0 means unsuccessful but that's not necessarily a bad thing
+    {
+        $null,$oPatchInstallResultCode = $oPatchInstallResultMessage.Line -split "OPatchInstall: Property 'SYS.PROC.RESULT' value '"
+        $oPatchInstallResultCode = $oPatchInstallResultCode.TrimEnd("'")
+        # OPatchInstall: Property 'SYS.PROC.RESULT' value '17028' means the patch was not needed or installed product was newer
+        if ($oPatchInstallResultCode -eq "17028") {Write-Host -ForegroundColor White "   - Patch not required; installed product is same or newer."}
+        elseif ($oPatchInstallResultCode -eq "17031")
+        {
+            Write-Warning "Error 17031: Detection: Invalid baseline"
+            Write-Warning "A baseline patch (e.g. March 2013 PU for SP2013, SP1 for SP2010) is missing!"
+            Write-Host -ForegroundColor Yellow "   - Either slipstream the missing patch first, or include the patch package in the ..\$spYear\Updates folder."
+            Pause "continue"
+        }
+        else {Write-Host "  - $($oPatchInstallResultCodes.$oPatchInstallResultCode)"}
+    }
+    Write-Host -ForegroundColor White "  - $updateName install completed in $delta."
 }
 #EndRegion
 
@@ -1103,7 +1229,7 @@ Function InstallCumulativeUpdates
 # ===================================================================================
 Function ConfigureFarmAdmin([xml]$xmlinput)
 {
-    If (($xmlinput.Configuration.Farm.Account.getAttribute("AddToLocalAdminsDuringSetup") -eq $true) -and (ShouldIProvision($xmlinput.Configuration.ServiceApps.UserProfileServiceApp) -eq $true))
+    If (($xmlinput.Configuration.Farm.Account.getAttribute("AddToLocalAdminsDuringSetup") -eq $true) -and (ShouldIProvision $xmlinput.Configuration.ServiceApps.UserProfileServiceApp -eq $true))
     {
         WriteLine
         #Add to Admins Group
@@ -1262,6 +1388,28 @@ Function CreateOrJoinFarm([xml]$xmlinput, $secPhrase, $farmCredential)
 }
 #EndRegion
 
+#Region PSConfig
+Function Run-PSConfig
+{
+    Start-Process -FilePath $PSConfig -ArgumentList "-cmd upgrade -inplace b2b -force -cmd applicationcontent -install -cmd installfeatures" -NoNewWindow -Wait
+}
+Function Check-PSConfig
+{
+    $PSConfigLogLocation = $((Get-SPDiagnosticConfig).LogLocation) -replace "%CommonProgramFiles%","$env:CommonProgramFiles"
+    $PSConfigLog = get-childitem $PSConfigLogLocation | ? {$_.Name -like "PSCDiagnostics*"} | Sort-Object -Descending -Property "LastWriteTime" | Select-Object -first 1
+    If ($PSConfigLog -eq $null)
+    {
+        Throw " - Could not find PSConfig log file!"
+    }
+    Else
+    {
+        # Get error(s) from log
+        $PSConfigLastError = $PSConfigLog | select-string -SimpleMatch -CaseSensitive -Pattern "ERR" | Select-Object -Last 1
+        return $PSConfigLastError
+    }
+}
+#EndRegion
+
 #Region Configure Farm
 # ===================================================================================
 # Func: CreateCentralAdmin
@@ -1269,7 +1417,7 @@ Function CreateOrJoinFarm([xml]$xmlinput, $secPhrase, $farmCredential)
 # ===================================================================================
 Function CreateCentralAdmin([xml]$xmlinput)
 {
-    If (ShouldIProvision($xmlinput.Configuration.Farm.CentralAdmin) -eq $true)
+    If (ShouldIProvision $xmlinput.Configuration.Farm.CentralAdmin -eq $true)
     {
         Try
         {
@@ -1388,9 +1536,9 @@ Function ConfigureFarm([xml]$xmlinput)
         If ($doFullConfig)
         {
             # Install Help Files
-                Write-Host -ForegroundColor White " - Installing Help Collection..."
-                Install-SPHelpCollection -All
-                ##WaitForHelpInstallToFinish
+            Write-Host -ForegroundColor White " - Installing Help Collection..."
+            Install-SPHelpCollection -All
+            ##WaitForHelpInstallToFinish
         }
         # Secure resources
         Write-Host -ForegroundColor White " - Securing Resources..."
@@ -1409,7 +1557,7 @@ Function ConfigureFarm([xml]$xmlinput)
         $centralAdmin = Get-SPWebApplication -IncludeCentralAdministration | ? {$_.Status -eq "Online"} | ? {$_.Url -like "*$($env:COMPUTERNAME):$centralAdminPort*"}
 
         # Provision CentralAdmin if indicated in AutoSPInstallerInput.xml and the CA web app doesn't already exist
-        If ((ShouldIProvision($xmlinput.Configuration.Farm.CentralAdmin) -eq $true) -and (!($centralAdmin))) {CreateCentralAdmin $xmlinput}
+        If ((ShouldIProvision $xmlinput.Configuration.Farm.CentralAdmin -eq $true) -and (!($centralAdmin))) {CreateCentralAdmin $xmlinput}
         # Update Central Admin branding text for SharePoint 2013 based on the XML input Environment attribute
         if ($env:spVer -eq "15" -and !([string]::IsNullOrEmpty($xmlinput.Configuration.Environment)))
         {
@@ -1438,6 +1586,30 @@ Function ConfigureFarm([xml]$xmlinput)
         {
             Throw $_
         }
+    }
+    # Check again if we need to run PSConfig, in case a CU was installed on a subsequent pass of AutoSPInstaller
+    if (CheckIfUpgradeNeeded -eq $true)
+    {
+        $retryNum = 1
+        Run-PSConfig
+        $PSConfigLastError = Check-PSConfig
+        while (!([string]::IsNullOrEmpty($PSConfigLastError)) -and $retryNum -le 4)
+        {
+            Write-Warning $PSConfigLastError.Line
+            Write-Host -ForegroundColor White " - An error occurred running PSConfig, trying again ($retryNum)..."
+            Start-Sleep -Seconds 5
+            $retryNum += 1
+            Run-PSConfig
+            $PSConfigLastError = Check-PSConfig
+        }
+        If ($retryNum -ge 5)
+        {
+            Write-Host -ForegroundColor White " - After $retryNum retries to run PSConfig, trying GUI-based..."
+            Start-Process -FilePath $PSConfigUI -NoNewWindow -Wait
+        }
+        Clear-Variable -Name PSConfigLastError -ErrorAction SilentlyContinue
+        Clear-Variable -Name PSConfigLog -ErrorAction SilentlyContinue
+        Clear-Variable -Name retryNum -ErrorAction SilentlyContinue
     }
     $spRegVersion = (Get-Item -Path "HKLM:\SOFTWARE\Microsoft\Shared Tools\Web Server Extensions\$env:spVer.0\").GetValue("Version")
     If (!($spRegVersion))
@@ -1482,12 +1654,6 @@ Function ConfigureFarm([xml]$xmlinput)
 #Region Configure Language Packs
 Function ConfigureLanguagePacks([xml]$xmlinput)
 {
-    If (!($farmPassphrase) -or ($farmPassphrase -eq ""))
-    {
-        $farmPassphrase = GetFarmPassPhrase $xmlinput
-    }
-    # If the farm passphrase is a secure string (it would be if we prompted for input earlier), we need to convert it back to plain text for PSConfig.exe to understand it
-    If ($farmPassphrase.GetType().Name -eq "SecureString") {$farmPassphrase = ConvertTo-PlainText $farmPassphrase}
     $installedOfficeServerLanguages = (Get-Item "HKLM:\Software\Microsoft\Office Server\$env:spVer.0\InstalledLanguages").GetValueNames() | ? {$_ -ne ""}
     $languagePackInstalled = (Get-Item -Path "HKLM:\SOFTWARE\Microsoft\Shared Tools\Web Server Extensions\$env:spVer.0\WSS\").GetValue("LanguagePackInstalled")
     # If there were language packs installed we need to run psconfig to configure them
@@ -1497,37 +1663,28 @@ Function ConfigureLanguagePacks([xml]$xmlinput)
         Write-Host -ForegroundColor White " - Configuring language packs..."
         # Let's sleep for a while to let the farm config catch up...
         Start-Sleep 20
-        $attemptNum += 1
+        $retryNum += 1
         # Run PSConfig.exe per http://sharepoint.stackexchange.com/questions/9927/sp2010-psconfig-fails-trying-to-configure-farm-after-installing-language-packs
         # Note this was changed from v2v to b2b as suggested by CodePlex user jwthompson98
-        Start-Process -FilePath $PSConfig -ArgumentList "-cmd upgrade -inplace b2b -force -cmd applicationcontent -install -cmd installfeatures" -NoNewWindow -Wait
-        $PSConfigLogLocation = $((Get-SPDiagnosticConfig).LogLocation) -replace "%CommonProgramFiles%","$env:CommonProgramFiles"
-        $PSConfigLog = get-childitem $PSConfigLogLocation | ? {$_.Name -like "PSCDiagnostics*"} | Sort-Object -Descending -Property "LastWriteTime" | Select-Object -first 1
-        If ($PSConfigLog -eq $null)
+        Run-PSConfig
+        $PSConfigLastError = Check-PSConfig
+        while (!([string]::IsNullOrEmpty($PSConfigLastError)) -and $retryNum -le 4)
         {
-            Throw " - Could not find PSConfig log file!"
+            Write-Warning $PSConfigLastError.Line
+            Write-Host -ForegroundColor White " - An error occurred running PSConfig, trying again ($retryNum)..."
+            Start-Sleep -Seconds 5
+            $retryNum += 1
+            Run-PSConfig
+            $PSConfigLastError = Check-PSConfig
         }
-        Else
+        If ($retryNum -ge 5)
         {
-            # Get error(s) from log
-            $PSConfigLastError = $PSConfigLog | select-string -SimpleMatch -CaseSensitive -Pattern "ERR" | Select-Object -Last 1
-            If ($PSConfigLastError)
-            {
-                Write-Warning $PSConfigLastError.Line
-                While ($attemptNum -le 4)
-                {
-                    Write-Host -ForegroundColor White " - An error occurred configuring language packs, trying again ($attemptNum)..."
-                    Start-Sleep -Seconds 5
-                    ConfigureLanguagePacks $xmlinput
-                }
-                If ($attemptNum -ge 5)
-                {
-                    Write-Host -ForegroundColor White " - After $attemptNum attempts to configure language packs, trying GUI-based..."
-                    Start-Process -FilePath $PSConfigUI -NoNewWindow -Wait
-                    $PSConfigLastError = $null
-                }
-            }
+            Write-Host -ForegroundColor White " - After $retryNum retries to run PSConfig, trying GUI-based..."
+            Start-Process -FilePath $PSConfigUI -NoNewWindow -Wait
         }
+        Clear-Variable -Name PSConfigLastError -ErrorAction SilentlyContinue
+        Clear-Variable -Name PSConfigLog -ErrorAction SilentlyContinue
+        Clear-Variable -Name retryNum -ErrorAction SilentlyContinue
         WriteLine
     }
 }
@@ -1688,7 +1845,7 @@ Function CreateGenericServiceApplication()
         Write-Host -ForegroundColor White " - Provisioning $serviceName..."
         # get the service instance
         $serviceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq $serviceInstanceType}
-        $serviceInstance = $serviceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+        $serviceInstance = $serviceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
         If (!$serviceInstance) { Throw " - Failed to get service instance - check product version (Standard vs. Enterprise)" }
         # Start Service instance
         Write-Host -ForegroundColor White " - Checking $($serviceInstance.TypeName) instance..."
@@ -1704,7 +1861,7 @@ Function CreateGenericServiceApplication()
                 Write-Host -ForegroundColor Blue "." -NoNewline
                 Start-Sleep 1
                 $serviceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq $serviceInstanceType}
-                $serviceInstance = $serviceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+                $serviceInstance = $serviceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
             }
                 Write-Host -BackgroundColor Blue -ForegroundColor Black $($serviceInstance.Status)
         }
@@ -1771,17 +1928,17 @@ Function CreateGenericServiceApplication()
 
 #Region Sandboxed Code Service
 # ===================================================================================
-# Func: StartSandboxedCodeService
-# Desc: Starts the SharePoint Foundation Sandboxed (User) Code Service
+# Func: ConfigureSandboxedCodeService
+# Desc: Configures the SharePoint Foundation Sandboxed (User) Code Service
 # ===================================================================================
-Function StartSandboxedCodeService
+Function ConfigureSandboxedCodeService
 {
-    If (ShouldIProvision($xmlinput.Configuration.Farm.Services.SandboxedCodeService) -eq $true)
+    If (ShouldIProvision $xmlinput.Configuration.Farm.Services.SandboxedCodeService -eq $true)
     {
         WriteLine
         Write-Host -ForegroundColor White " - Starting Sandboxed Code Service"
         $sandboxedCodeServices = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.Administration.SPUserCodeServiceInstance"}
-        $sandboxedCodeService = $sandboxedCodeServices | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+        $sandboxedCodeService = $sandboxedCodeServices | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
         If ($sandboxedCodeService.Status -ne "Online")
         {
             Try
@@ -1803,7 +1960,7 @@ Function StartSandboxedCodeService
                 Write-Host -ForegroundColor Blue "." -NoNewline
                 Start-Sleep 1
                 $sandboxedCodeServices = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.Administration.SPUserCodeServiceInstance"}
-                $sandboxedCodeService = $sandboxedCodeServices | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+                $sandboxedCodeService = $sandboxedCodeServices | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
             }
             Write-Host -BackgroundColor Blue -ForegroundColor Black $($sandboxedCodeService.Status)
         }
@@ -1823,7 +1980,7 @@ Function StartSandboxedCodeService
 # ===================================================================================
 Function CreateMetadataServiceApp([xml]$xmlinput)
 {
-    If (ShouldIProvision($xmlinput.Configuration.ServiceApps.ManagedMetadataServiceApp) -eq $true)
+    If (ShouldIProvision $xmlinput.Configuration.ServiceApps.ManagedMetadataServiceApp -eq $true)
     {
         WriteLine
         Try
@@ -1845,7 +2002,7 @@ Function CreateMetadataServiceApp([xml]$xmlinput)
             Write-Host -ForegroundColor White " - Starting Managed Metadata Service:"
             # Get the service instance
             $metadataServiceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.Taxonomy.MetadataWebServiceInstance"}
-            $metadataServiceInstance = $metadataServiceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+            $metadataServiceInstance = $metadataServiceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
             If (-not $?) { Throw " - Failed to find Metadata service instance" }
             # Start Service instances
             If($metadataServiceInstance.Status -eq "Disabled")
@@ -1860,7 +2017,7 @@ Function CreateMetadataServiceApp([xml]$xmlinput)
                     Write-Host -ForegroundColor Blue "." -NoNewline
                     Start-Sleep 1
                     $metadataServiceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.Taxonomy.MetadataWebServiceInstance"}
-                    $metadataServiceInstance = $metadataServiceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+                    $metadataServiceInstance = $metadataServiceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
                 }
                 Write-Host -BackgroundColor Blue -ForegroundColor Black ($metadataServiceInstance.Status)
             }
@@ -2030,11 +2187,11 @@ Function AssignCert([xml]$xmlinput)
         # Check if we have specified no host header
         if (!([string]::IsNullOrEmpty($webApp.UseHostHeader)) -and $webApp.UseHostHeader -eq $false)
         {
-            Set-ItemProperty IIS:\Sites\$SSLSiteName -Name bindings -Value @{protocol="https";bindingInformation="*:$($SSLPort):*"}
+            Set-ItemProperty IIS:\Sites\$SSLSiteName -Name bindings -Value @{protocol="https";bindingInformation="*:$($SSLPort):"} -ErrorAction SilentlyContinue
         }
         else # Set the binding to the host header
         {
-            Set-ItemProperty IIS:\Sites\$SSLSiteName -Name bindings -Value @{protocol="https";bindingInformation="*:$($SSLPort):$($SSLHostHeader)"}
+            Set-ItemProperty IIS:\Sites\$SSLSiteName -Name bindings -Value @{protocol="https";bindingInformation="*:$($SSLPort):$($SSLHostHeader)"} -ErrorAction SilentlyContinue
         }
         ## Set-WebBinding -Name $SSLSiteName -BindingInformation ":$($SSLPort):" -PropertyName Port -Value $SSLPort -PropertyName Protocol -Value https
         Write-Host -ForegroundColor White " - Certificate has been assigned to site `"https://$SSLHostHeader`:$SSLPort`""
@@ -2058,12 +2215,12 @@ Function CreateWebApplications([xml]$xmlinput)
         ForEach ($webApp in $xmlinput.Configuration.WebApplications.WebApplication)
         {
             CreateWebApp $webApp
-            ConfigureObjectCache $webApp
             ConfigureOnlineWebPartCatalog $webApp
             Add-LocalIntranetURL $webApp.URL
             WriteLine
         }
-        If (($xmlinput.Configuration.WebApplications.AddURLsToHOSTS) -eq $true)
+        # Updated so that we don't add URLs to the local hosts file of a server that's not running the Foundation Web Application service
+        If ($xmlinput.Configuration.WebApplications.AddURLsToHOSTS -eq $true -and !(($xmlinput.Configuration.Farm.Services.SelectSingleNode("FoundationWebApplication")) -and !(ShouldIProvision $xmlinput.Configuration.Farm.Services.FoundationWebApplication)))
         {AddToHOSTS}
     }
     WriteLine
@@ -2155,13 +2312,13 @@ Function CreateWebApp([System.Xml.XmlElement]$webApp)
 
     # If we are provisioning any Office Web Apps, Visio, Excel, Access or PerformancePoint services, we need to grant the generic app pool account access to the newly-created content database
     # Per http://technet.microsoft.com/en-us/library/ff829837.aspx and http://autospinstaller.codeplex.com/workitem/16224 (thanks oceanfly!)
-    If ((ShouldIProvision($xmlinput.Configuration.OfficeWebApps.ExcelService) -eq $true) -or `
-        (ShouldIProvision($xmlinput.Configuration.OfficeWebApps.PowerPointService) -eq $true) -or `
-        (ShouldIProvision($xmlinput.Configuration.OfficeWebApps.WordViewingService) -eq $true) -or `
-        (ShouldIProvision($xmlinput.Configuration.EnterpriseServiceApps.VisioService) -eq $true) -or `
-        (ShouldIProvision($xmlinput.Configuration.EnterpriseServiceApps.ExcelServices) -eq $true) -or `
-        (ShouldIProvision($xmlinput.Configuration.EnterpriseServiceApps.AccessService) -eq $true) -or `
-        (ShouldIProvision($xmlinput.Configuration.EnterpriseServiceApps.PerformancePointService) -eq $true))
+    If ((ShouldIProvision $xmlinput.Configuration.OfficeWebApps.ExcelService -eq $true) -or `
+        (ShouldIProvision $xmlinput.Configuration.OfficeWebApps.PowerPointService -eq $true) -or `
+        (ShouldIProvision $xmlinput.Configuration.OfficeWebApps.WordViewingService -eq $true) -or `
+        (ShouldIProvision $xmlinput.Configuration.EnterpriseServiceApps.VisioService -eq $true) -or `
+        (ShouldIProvision $xmlinput.Configuration.EnterpriseServiceApps.ExcelServices -eq $true) -or `
+        (ShouldIProvision $xmlinput.Configuration.EnterpriseServiceApps.AccessService -eq $true) -or `
+        (ShouldIProvision $xmlinput.Configuration.EnterpriseServiceApps.PerformancePointService -eq $true))
     {
         $spservice = Get-spserviceaccountxml $xmlinput
         Write-Host -ForegroundColor White " - Granting $($spservice.username) rights to `"$webAppName`"..." -NoNewline
@@ -2169,6 +2326,15 @@ Function CreateWebApp([System.Xml.XmlElement]$webApp)
         $wa.GrantAccessToProcessIdentity("$($spservice.username)")
         Write-Host -ForegroundColor White "Done."
     }
+    if ($webApp.GrantCurrentUserFullControl -eq $true)
+    {
+        $currentUser = "$env:USERDOMAIN\$env:USERNAME"
+        $wa = Get-SPWebApplication | Where-Object {$_.DisplayName -eq $webAppName}
+        if ($wa.UseClaimsAuthentication -eq $true) {$currentUser = 'i:0#.w|' + $currentUser}
+        Set-WebAppUserPolicy $wa $currentUser "$env:USERNAME" "Full Control"
+    }
+    WriteLine
+    ConfigureObjectCache $webApp
 
     ForEach ($siteCollection in $webApp.SiteCollections.SiteCollection)
     {
@@ -2226,15 +2392,19 @@ Function CreateWebApp([System.Xml.XmlElement]$webApp)
                     $site.RootWeb.RegionalSettings.Time24 = $([System.Convert]::ToBoolean($siteCollectionTime24))
                 }
                 $site.RootWeb.Update()
-                if ($siteCollection.HostNamedSiteCollection -eq $true -and $xmlinput.Configuration.WebApplications.AddURLsToHOSTS)
-                {
-                    # Add the hostname of this host header-based site collection to the local HOSTS so it's immediately resolvable locally
-                    $hostname,$null = $siteURL -replace "http://","" -replace "https://","" -split ":"
-                    AddToHosts $hostname
-                }
             }
         }
         Else {Write-Host -ForegroundColor White " - Skipping creation of site `"$siteCollectionName`" - already provisioned."}
+        if ($siteCollection.HostNamedSiteCollection -eq $true)
+        {
+            Add-LocalIntranetURL ($siteURL)
+            if ($xmlinput.Configuration.WebApplications.AddURLsToHOSTS)
+            {
+                # Add the hostname of this host header-based site collection to the local HOSTS so it's immediately resolvable locally
+                $hostname,$null = $siteURL -replace "http://","" -replace "https://","" -split ":"
+                AddToHosts $hostname
+            }
+        }
         WriteLine
     }
 }
@@ -2251,7 +2421,9 @@ Function Set-WebAppUserPolicy($wa, $userName, $displayName, $perm)
     [Microsoft.SharePoint.Administration.SPPolicyCollection]$policies = $wa.Policies
     [Microsoft.SharePoint.Administration.SPPolicy]$policy = $policies.Add($userName, $displayName)
     [Microsoft.SharePoint.Administration.SPPolicyRole]$policyRole = $wa.PolicyRoles | where {$_.Name -eq $perm}
-    If ($policyRole -ne $null) {
+    If ($policyRole -ne $null)
+    {
+        Write-Host -ForegroundColor White " - Granting $userName $perm to $($wa.Url)..."
         $policy.PolicyRoleBindings.Add($policyRole)
     }
     $wa.Update()
@@ -2408,14 +2580,14 @@ Function CreateUserProfileServiceApplication([xml]$xmlinput)
         }
         else {$hostHeaderSwitch = @{HostHeader = $hostHeader}}
 
-        If (ShouldIProvision($userProfile) -eq $true)
+        If (ShouldIProvision $userProfile -eq $true)
         {
             WriteLine
             Write-Host -ForegroundColor White " - Provisioning $($userProfile.Name)"
             $applicationPool = Get-HostedServicesAppPool $xmlinput
             # get the service instance
             $profileServiceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Administration.UserProfileServiceInstance"}
-            $profileServiceInstance = $profileServiceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+            $profileServiceInstance = $profileServiceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
             If (-not $?) { Throw " - Failed to find User Profile Service instance" }
             # Start Service instance
             Write-Host -ForegroundColor White " - Starting User Profile Service instance..."
@@ -2430,7 +2602,7 @@ Function CreateUserProfileServiceApplication([xml]$xmlinput)
                     Write-Host -ForegroundColor Blue "." -NoNewline
                     Start-Sleep 1
                     $profileServiceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Administration.UserProfileServiceInstance"}
-                    $profileServiceInstance = $profileServiceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+                    $profileServiceInstance = $profileServiceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
                 }
                 Write-Host -BackgroundColor Blue -ForegroundColor Black $($profileServiceInstance.Status)
             }
@@ -2587,7 +2759,7 @@ Function CreateUserProfileServiceApplication([xml]$xmlinput)
                 # Get User Profile Synchronization Service
                 Write-Host -ForegroundColor White " - Checking User Profile Synchronization Service..." -NoNewline
                 $profileSyncServices = @(Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Administration.ProfileSynchronizationServiceInstance"})
-                $profileSyncService = $profileSyncServices | ? {$_.Parent.Address -eq $env:COMPUTERNAME}
+                $profileSyncService = $profileSyncServices | ? {MatchComputerName $_.Parent.Address $env:COMPUTERNAME}
                 # Attempt to start only if there are no online Profile Sync Service instances in the farm as we don't want to start multiple Sync instances (running against the same Profile Service at least)
                 If (!($profileSyncServices | ? {$_.Status -eq "Online"}))
                 {
@@ -2619,7 +2791,7 @@ Function CreateUserProfileServiceApplication([xml]$xmlinput)
                         {
                             Write-Host -ForegroundColor Blue "." -NoNewline
                             Start-Sleep 1
-                            $profileSyncService = @(Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Administration.ProfileSynchronizationServiceInstance"}) | ? {$_.Parent.Address -eq $env:COMPUTERNAME}
+                            $profileSyncService = @(Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Administration.ProfileSynchronizationServiceInstance"}) | ? {MatchComputerName $_.Parent.Address $env:COMPUTERNAME}
                         }
                         If ($profileSyncService.Status -eq "Provisioning")
                         {
@@ -2630,7 +2802,7 @@ Function CreateUserProfileServiceApplication([xml]$xmlinput)
                         {
                             Write-Host -ForegroundColor Blue "." -NoNewline
                             Start-Sleep 1
-                            $profileSyncService = @(Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Administration.ProfileSynchronizationServiceInstance"}) | ? {$_.Parent.Address -eq $env:COMPUTERNAME}
+                            $profileSyncService = @(Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Administration.ProfileSynchronizationServiceInstance"}) | ? {MatchComputerName $_.Parent.Address $env:COMPUTERNAME}
                         }
                         If ($profileSyncService.Status -ne "Online")
                         {
@@ -2666,7 +2838,7 @@ Function CreateUserProfileServiceApplication([xml]$xmlinput)
                         $addProfileSyncCmd = @"
 Add-PsSnapin Microsoft.SharePoint.PowerShell
 Write-Host -ForegroundColor White " - Creating default Sync connection..."
-`$syncConnectionAcctPWD = (ConvertTo-SecureString -String "$($userProfile.SyncConnectionAccountPassword)" -AsPlainText -Force)
+`$syncConnectionAcctPWD = (ConvertTo-SecureString -String `'$($userProfile.SyncConnectionAccountPassword)`' -AsPlainText -Force)
 Add-SPProfileSyncConnection -ProfileServiceApplication $($profileServiceApp.Id) -ConnectionForestName $env:USERDNSDOMAIN -ConnectionDomain $syncConnectionDomain -ConnectionUserName "$syncConnectionAcct" -ConnectionSynchronizationOU "$connectionSyncOU" -ConnectionPassword `$syncConnectionAcctPWD
 If (!`$?)
 {
@@ -2785,7 +2957,7 @@ Function CreateUPSAsAdmin([xml]$xmlinput)
 Function CreateStateServiceApp([xml]$xmlinput)
 {
     $stateService = $xmlinput.Configuration.ServiceApps.StateService
-    If (ShouldIProvision($stateService) -eq $true)
+    If (ShouldIProvision $stateService -eq $true)
     {
         WriteLine
         Try
@@ -2831,7 +3003,7 @@ Function CreateStateServiceApp([xml]$xmlinput)
 # ===================================================================================
 Function CreateSPUsageApp([xml]$xmlinput)
 {
-    If (ShouldIProvision($xmlinput.Configuration.ServiceApps.SPUsageService) -eq $true)
+    If (ShouldIProvision $xmlinput.Configuration.ServiceApps.SPUsageService -eq $true)
     {
         WriteLine
         Try
@@ -3068,7 +3240,7 @@ Function ConfigureUsageLogging([xml]$xmlinput)
 
 Function CreateWebAnalyticsApp([xml]$xmlinput)
 {
-    If ((ShouldIProvision($xmlinput.Configuration.ServiceApps.WebAnalyticsService) -eq $true) -and ($env:spVer -eq "14"))
+    If ((ShouldIProvision $xmlinput.Configuration.ServiceApps.WebAnalyticsService -eq $true) -and ($env:spVer -eq "14"))
     {
         WriteLine
         Try
@@ -3088,12 +3260,12 @@ Function CreateWebAnalyticsApp([xml]$xmlinput)
             # Start Analytics service instances
             Write-Host -ForegroundColor White " - Checking Analytics Service instances..."
             $analyticsWebServiceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.WebAnalytics.Administration.WebAnalyticsWebServiceInstance"}
-            $analyticsWebServiceInstance = $analyticsWebServiceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+            $analyticsWebServiceInstance = $analyticsWebServiceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
             If (-not $?) { Throw " - Failed to find Analytics Web Service instance" }
             Write-Host -ForegroundColor White " - Starting local Analytics Web Service instance..."
             $analyticsWebServiceInstance.Provision()
             $analyticsDataProcessingInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.WebAnalytics.Administration.WebAnalyticsServiceInstance"}
-            $analyticsDataProcessingInstance = $analyticsDataProcessingInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+            $analyticsDataProcessingInstance = $analyticsDataProcessingInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
             If (-not $?) { Throw " - Failed to find Analytics Data Processing Service instance" }
             UpdateProcessIdentity $analyticsDataProcessingInstance
             $analyticsDataProcessingInstance.Update()
@@ -3124,7 +3296,7 @@ Function CreateWebAnalyticsApp([xml]$xmlinput)
 #Region Create Secure Store Service Application
 Function CreateSecureStoreServiceApp
 {
-    If (ShouldIProvision($xmlinput.Configuration.ServiceApps.SecureStoreService) -eq $true)
+    If (ShouldIProvision $xmlinput.Configuration.ServiceApps.SecureStoreService -eq $true)
     {
         WriteLine
         Try
@@ -3148,7 +3320,7 @@ Function CreateSecureStoreServiceApp
             $applicationPool = Get-HostedServicesAppPool $xmlinput
             # Get the service instance
             $secureStoreServiceInstances = Get-SPServiceInstance | ? {$_.GetType().Equals([Microsoft.Office.SecureStoreService.Server.SecureStoreServiceInstance])}
-            $secureStoreServiceInstance = $secureStoreServiceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+            $secureStoreServiceInstance = $secureStoreServiceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
             If (-not $?) { Throw " - Failed to find Secure Store service instance" }
             # Start Service instance
             If ($secureStoreServiceInstance.Status -eq "Disabled")
@@ -3163,7 +3335,7 @@ Function CreateSecureStoreServiceApp
                     Write-Host -ForegroundColor Blue "." -NoNewline
                     Start-Sleep 1
                     $secureStoreServiceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.SecureStoreService.Server.SecureStoreServiceInstance"}
-                    $secureStoreServiceInstance = $secureStoreServiceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+                    $secureStoreServiceInstance = $secureStoreServiceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
                 }
                 Write-Host -BackgroundColor Blue -ForegroundColor Black $($secureStoreServiceInstance.Status)
             }
@@ -3208,14 +3380,14 @@ Function CreateSecureStoreServiceApp
 #Region Start Search Query and Site Settings Service
 Function StartSearchQueryAndSiteSettingsService
 {
-    If (ShouldIProvision($xmlinput.Configuration.Farm.Services.SearchQueryAndSiteSettingsService) -eq $true)
+    If (ShouldIProvision $xmlinput.Configuration.Farm.Services.SearchQueryAndSiteSettingsService -eq $true)
     {
         WriteLine
         Try
         {
             # Get the service instance
             $searchQueryAndSiteSettingsServices = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Search.Administration.SearchQueryAndSiteSettingsServiceInstance"}
-            $searchQueryAndSiteSettingsService = $searchQueryAndSiteSettingsServices | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+            $searchQueryAndSiteSettingsService = $searchQueryAndSiteSettingsServices | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
             If (-not $?) { Throw " - Failed to find Search Query and Site Settings service instance" }
             # Start Service instance
             Write-Host -ForegroundColor White " - Starting Search Query and Site Settings Service Instance..."
@@ -3230,7 +3402,7 @@ Function StartSearchQueryAndSiteSettingsService
                     Write-Host -ForegroundColor Blue "." -NoNewline
                     Start-Sleep 1
                     $searchQueryAndSiteSettingsServices = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Search.Administration.SearchQueryAndSiteSettingsServiceInstance"}
-                    $searchQueryAndSiteSettingsService = $searchQueryAndSiteSettingsServices | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+                    $searchQueryAndSiteSettingsService = $searchQueryAndSiteSettingsServices | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
                 }
                 Write-Host -BackgroundColor Blue -ForegroundColor Black $($searchQueryAndSiteSettingsService.Status)
             }
@@ -3246,20 +3418,20 @@ Function StartSearchQueryAndSiteSettingsService
 }
 #EndRegion
 
-#Region Start Claims to Windows Token Service
-Function StartClaimsToWindowsTokenService
+#Region Configure Claims to Windows Token Service
+Function ConfigureClaimsToWindowsTokenService
 {
     # C2WTS is required by Excel Services, Visio Services and PerformancePoint Services; if any of these are being provisioned we should start it.
-    If ((ShouldIProvision($xmlinput.Configuration.Farm.Services.ClaimsToWindowsTokenService) -eq $true) -or `
-        (ShouldIProvision($xmlinput.Configuration.EnterpriseServiceApps.ExcelServices) -eq $true) -or `
-        (ShouldIProvision($xmlinput.Configuration.EnterpriseServiceApps.VisioService) -eq $true) -or `
-        (ShouldIProvision($xmlinput.Configuration.EnterpriseServiceApps.PerformancePointService) -eq $true) -or `
-        (ShouldIProvision($xmlinput.Configuration.OfficeWebApps.ExcelService) -eq $true))
+    If ((ShouldIProvision $xmlinput.Configuration.Farm.Services.ClaimsToWindowsTokenService -eq $true) -or `
+        (ShouldIProvision $xmlinput.Configuration.EnterpriseServiceApps.ExcelServices -eq $true) -or `
+        (ShouldIProvision $xmlinput.Configuration.EnterpriseServiceApps.VisioService -eq $true) -or `
+        (ShouldIProvision $xmlinput.Configuration.EnterpriseServiceApps.PerformancePointService -eq $true) -or `
+        (ShouldIProvision $xmlinput.Configuration.OfficeWebApps.ExcelService -eq $true))
     {
         WriteLine
         # Ensure Claims to Windows Token Service is started
         $claimsServices = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.Administration.Claims.SPWindowsTokenServiceInstance"}
-        $claimsService = $claimsServices | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+        $claimsService = $claimsServices | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
         If ($claimsService.Status -ne "Online")
         {
             Try
@@ -3269,6 +3441,19 @@ Function StartClaimsToWindowsTokenService
                 {
                     UpdateProcessIdentity $claimsService
                     $claimsService.Update()
+                    # Add C2WTS account (currently the generic service account) to local admins
+                    $builtinAdminGroup = Get-AdministratorsGroup
+                    $adminGroup = ([ADSI]"WinNT://$env:COMPUTERNAME/$builtinAdminGroup,group")
+                    # This syntax comes from Ying Li (http://myitforum.com/cs2/blogs/yli628/archive/2007/08/30/powershell-script-to-add-remove-a-domain-user-to-the-local-administrators-group-on-a-remote-machine.aspx)
+                    $localAdmins = $adminGroup.psbase.invoke("Members") | ForEach-Object {$_.GetType().InvokeMember("Name", 'GetProperty', $null, $_, $null)}
+                    $spservice = Get-spserviceaccountxml $xmlinput
+                    $managedAccountGen = Get-SPManagedAccount | Where-Object {$_.UserName -eq $($spservice.username)}
+                    $managedAccountDomain,$managedAccountUser = $managedAccountGen.UserName -split "\\"
+                    If (!($localAdmins -contains $managedAccountUser))
+                    {
+                        Write-Host -ForegroundColor White " - Adding $($managedAccountGen.Username) to local Administrators..."
+                        ([ADSI]"WinNT://$env:COMPUTERNAME/$builtinAdminGroup,group").Add("WinNT://$managedAccountDomain/$managedAccountUser")
+                    }
                 }
                 $claimsService.Provision()
                 If (-not $?) {throw " - Failed to start $($claimsService.DisplayName)"}
@@ -3284,7 +3469,7 @@ Function StartClaimsToWindowsTokenService
                 Write-Host -ForegroundColor Blue "." -NoNewline
                 sleep 1
                 $claimsServices = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.Administration.Claims.SPWindowsTokenServiceInstance"}
-                $claimsService = $claimsServices | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+                $claimsService = $claimsServices | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
             }
             Write-Host -BackgroundColor Blue -ForegroundColor Black $($claimsService.Status)
         }
@@ -3292,58 +3477,56 @@ Function StartClaimsToWindowsTokenService
         {
             Write-Host -ForegroundColor White " - $($claimsService.DisplayName) already started."
         }
+        Write-Host -ForegroundColor White " - Setting C2WTS to depend on Cryptographic Services..."
+        Start-Process -FilePath "$env:windir\System32\sc.exe" -ArgumentList "config c2wts depend= CryptSvc" -Wait -NoNewWindow -ErrorAction SilentlyContinue
         WriteLine
     }
 }
 #EndRegion
 
-#Region Stop Foundation Web Service
+#Region Stop Specified Service Instance
 # ===================================================================================
-# Func: StopFoundationWebService
-# Desc: Disables the Microsoft SharePoint Foundation Web Application service instance (for App servers)
+# Func: StopServiceInstance
+# Desc: Disables a specified service instance (e.g. on dedicated App servers or WFEs)
 # ===================================================================================
-Function StopFoundationWebService
+Function StopServiceInstance ($service)
 {
-    $foundationWebServices = Get-SPServiceInstance | ? {$_.Service.ToString() -eq "SPWebService"}
-    $foundationWebService = $foundationWebServices | ? {$_.Server.Address -eq $env:COMPUTERNAME}
-    Write-Host -ForegroundColor White " - Stopping $($foundationWebService.TypeName)..."
-    $foundationWebService.Unprovision()
-    If (-not $?) {Throw " - Failed to stop $($foundationWebService.TypeName)" }
-    # Wait
-    Write-Host -ForegroundColor Blue " - Waiting for $($foundationWebService.TypeName) to stop..." -NoNewline
-    While ($foundationWebService.Status -ne "Disabled")
+    WriteLine
+    $serviceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq $service -and $_.Name -ne "WSS_Administration"} # Need to filter out WSS_Administration because the Central Administration service instance shares the same Type as the Foundation Web Application Service
+    $serviceInstance = $serviceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
+    Write-Host -ForegroundColor White " - Stopping $($serviceInstance.TypeName)..."
+    if ($serviceInstance.Status -eq "Online")
     {
-        Write-Host -ForegroundColor Blue "." -NoNewline
-        Start-Sleep 1
-        $foundationWebServices = Get-SPServiceInstance | ? {$_.Service.ToString() -eq "SPWebService"}
-        $foundationWebService = $foundationWebServices | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+        $serviceInstance.Unprovision()
+        If (-not $?) {Throw " - Failed to stop $($serviceInstance.TypeName)" }
+        # Wait
+        Write-Host -ForegroundColor Blue " - Waiting for $($serviceInstance.TypeName) to stop..." -NoNewline
+        While ($serviceInstance.Status -ne "Disabled")
+        {
+            Write-Host -ForegroundColor Blue "." -NoNewline
+            Start-Sleep 1
+            $serviceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq $service}
+            $serviceInstance = $serviceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
+        }
+        Write-Host -BackgroundColor Blue -ForegroundColor Black $($serviceInstance.Status)
     }
-    Write-Host -BackgroundColor Blue -ForegroundColor Black $($foundationWebService.Status)
+    Else {Write-Host -ForegroundColor White " - Already stopped."}
+    WriteLine
 }
 #EndRegion
 
-#Region Stop Workflow Timer Service
+#Region Configure Workflow Timer Service
 # ===================================================================================
-# Func: StopWorkflowTimerService
-# Desc: Disables the Microsoft SharePoint Foundation Workflow Timer Service
+# Func: ConfigureWorkflowTimerService
+# Desc: Configures the Microsoft SharePoint Foundation Workflow Timer Service
 # ===================================================================================
-Function StopWorkflowTimerService
+Function ConfigureWorkflowTimerService
 {
-    $workflowTimerServices = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.Workflow.SPWorkflowTimerServiceInstance"}
-    $workflowTimerService = $workflowTimerServices | ? {$_.Server.Address -eq $env:COMPUTERNAME}
-    Write-Host -ForegroundColor White " - Stopping $($workflowTimerService.TypeName)..."
-    $workflowTimerService.Unprovision()
-    If (-not $?) {Throw " - Failed to stop $($workflowTimerService.TypeName)" }
-    # Wait
-    Write-Host -ForegroundColor Blue " - Waiting for $($workflowTimerService.TypeName) to stop..." -NoNewline
-    While ($workflowTimerService.Status -ne "Disabled")
+    # Ensure the node exists in the XML first as we don't want to inadvertently disable the service if it wasn't explicitly specified
+    if (($xmlinput.Configuration.Farm.Services.SelectSingleNode("WorkflowTimer")) -and !(ShouldIProvision $xmlinput.Configuration.Farm.Services.WorkflowTimer))
     {
-        Write-Host -ForegroundColor Blue "." -NoNewline
-        Start-Sleep 1
-        $workflowTimerServices = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.Workflow.SPWorkflowTimerServiceInstance"}
-        $workflowTimerService = $workflowTimerServices | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+        StopServiceInstance "Microsoft.SharePoint.Workflow.SPWorkflowTimerServiceInstance"
     }
-    Write-Host -BackgroundColor Blue -ForegroundColor Black $($workflowTimerService.Status)
 }
 #EndRegion
 
@@ -3440,6 +3623,7 @@ Function ConfigureTracing ([xml]$xmlinput)
 # ====================================================================================
 # Func: ConfigureDistributedCacheService
 # Desc: Updates the service account for AppFabricCachingService AKA Distributed Caching Service
+# Info: http://technet.microsoft.com/en-us/library/jj219613.aspx
 # ====================================================================================
 
 Function ConfigureDistributedCacheService ([xml]$xmlinput)
@@ -3462,6 +3646,21 @@ Function ConfigureDistributedCacheService ([xml]$xmlinput)
             Write-Output $_
             Write-Warning "An error occurred updating the service account for service AppFabricCachingService."
         }
+        # Ensure the node exists in the XML first as we don't want to inadvertently disable the service if it wasn't explicitly specified
+        if (($xmlinput.Configuration.Farm.Services.SelectSingleNode("DistributedCache")) -and !(ShouldIProvision $xmlinput.Configuration.Farm.Services.DistributedCache))
+        {
+            ##StopServiceInstance "Microsoft.SharePoint.DistributedCaching.Utilities.SPDistributedCacheServiceInstance"
+            $serviceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.DistributedCaching.Utilities.SPDistributedCacheServiceInstance"}
+            $serviceInstance = $serviceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
+            Write-Host -ForegroundColor White " - Stopping the Distributed Cache Service..." -NoNewline
+            if ($serviceInstance.Status -eq "Online")
+            {
+            Stop-SPDistributedCacheServiceInstance -Graceful
+            Remove-SPDistributedCacheServiceInstance
+            Write-Host -ForegroundColor White "Done."
+            }
+            else {Write-Host -ForegroundColor White "Already stopped."}
+        }
         WriteLine
     }
 }
@@ -3481,7 +3680,7 @@ Function ConfigureDistributedCacheService ([xml]$xmlinput)
 
 function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
 {
-    If (ShouldIProvision($xmlinput.Configuration.ServiceApps.EnterpriseSearchService) -eq $true)
+    If (ShouldIProvision $xmlinput.Configuration.ServiceApps.EnterpriseSearchService -eq $true)
     {
         WriteLine
         Write-Host -ForegroundColor White " - Provisioning Enterprise Search..."
@@ -3534,9 +3733,9 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
         {
             $svcConfig.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication | ForEach-Object {
                 $appConfig = $_
-                If (($appConfig.DatabaseServer -ne "") -and ($appConfig.DatabaseServer -ne $null))
+                If (!([string]::IsNullOrEmpty($appConfig.Database.DBServer)))
                 {
-                    $dbServer = $appConfig.DatabaseServer
+                    $dbServer = $appConfig.Database.DBServer
                 }
                 Else
                 {
@@ -3551,7 +3750,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                     Write-Host -ForegroundColor White " - Creating $($appConfig.Name)..."
                     $searchApp = New-SPEnterpriseSearchServiceApplication -Name $appConfig.Name `
                         -DatabaseServer $dbServer `
-                        -DatabaseName $($dbPrefix+$appConfig.DatabaseName) `
+                        -DatabaseName $($dbPrefix+$appConfig.Database.Name) `
                         -FailoverDatabaseServer $appConfig.FailoverDatabaseServer `
                         -ApplicationPool $pool `
                         -AdminApplicationPool $adminPool `
@@ -3574,10 +3773,10 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                     if ($?) {Write-Host -ForegroundColor White "Done."}
                 }
 
-                $installCrawlSvc = (($appConfig.CrawlComponent.Server | where {$_.Name -eq $env:computername}) -ne $null)
-                $installQuerySvc = (($appConfig.QueryComponent.Server | where {$_.Name -eq $env:computername}) -ne $null)
-                $installAdminComponent = (($appConfig.AdminComponent.Server | where {$_.Name -eq $env:computername}) -ne $null)
-                $installSyncSvc = (($appConfig.SearchQueryAndSiteSettingsServers.Server | where {$_.Name -eq $env:computername}) -ne $null)
+                $installCrawlSvc = (($appConfig.CrawlComponent.Server | where {MatchComputerName $_.Name $env:COMPUTERNAME}) -ne $null)
+                $installQuerySvc = (($appConfig.QueryComponent.Server | where {MatchComputerName $_.Name $env:COMPUTERNAME}) -ne $null)
+                $installAdminComponent = (($appConfig.AdminComponent.Server | where {MatchComputerName $_.Name $env:COMPUTERNAME}) -ne $null)
+                $installSyncSvc = (($appConfig.SearchQueryAndSiteSettingsServers.Server | where {MatchComputerName $_.Name $env:COMPUTERNAME}) -ne $null)
 
                 If ($searchSvc.Status -ne "Online" -and ($installCrawlSvc -or $installQuerySvc)) {
                     $searchSvc | Start-SPEnterpriseSearchServiceInstance
@@ -3615,9 +3814,9 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                 }
 
                 If ($installCrawlSvc) {
-                    $crawlComponent = $crawlTopology.CrawlComponents | where {$_.ServerName -eq $env:ComputerName}
+                    $crawlComponent = $crawlTopology.CrawlComponents | where {MatchComputerName $_.ServerName $env:COMPUTERNAME}
                     If ($crawlTopology.CrawlComponents.Count -eq 0 -or $crawlComponent -eq $null) {
-                        $crawlStore = $searchApp.CrawlStores | where {$_.Name -eq "$($dbPrefix+$appConfig.DatabaseName)_CrawlStore"}
+                        $crawlStore = $searchApp.CrawlStores | where {$_.Name -eq "$($dbPrefix+$appConfig.Database.Name)_CrawlStore"}
                         Write-Host -ForegroundColor White " - Creating new crawl component..."
                         $crawlComponent = New-SPEnterpriseSearchCrawlComponent -SearchServiceInstance $searchSvc -SearchApplication $searchApp -CrawlTopology $crawlTopology -CrawlDatabase $crawlStore.Id.ToString() -IndexLocation $indexLocation
                     } Else {
@@ -3649,13 +3848,13 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                 }
 
                 If ($installQuerySvc) {
-                    $queryComponent = $queryTopology.QueryComponents | where {$_.ServerName -eq $env:ComputerName}
+                    $queryComponent = $queryTopology.QueryComponents | where {MatchComputerName $_.ServerName $env:COMPUTERNAME}
                     If ($queryComponent -eq $null) {
                         $partition = ($queryTopology | Get-SPEnterpriseSearchIndexPartition)
                         Write-Host -ForegroundColor White " - Creating new query component..."
                         $queryComponent = New-SPEnterpriseSearchQueryComponent -IndexPartition $partition -QueryTopology $queryTopology -SearchServiceInstance $searchSvc -ShareName $svcConfig.ShareName -IndexLocation $indexLocation
                         Write-Host -ForegroundColor White " - Setting index partition and property store database..."
-                        $propertyStore = $searchApp.PropertyStores | where {$_.Name -eq "$($dbPrefix+$appConfig.DatabaseName)_PropertyStore"}
+                        $propertyStore = $searchApp.PropertyStores | where {$_.Name -eq "$($dbPrefix+$appConfig.Database.Name)_PropertyStore"}
                         $partition | Set-SPEnterpriseSearchIndexPartition -PropertyDatabase $propertyStore.Id.ToString()
                     } Else {
                         Write-Host -ForegroundColor White " - Query component already exists, skipping query component creation."
@@ -3665,7 +3864,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                 If ($installSyncSvc) {
                     # SLN: Updated to new syntax
                     $searchQueryAndSiteSettingsServices = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Search.Administration.SearchQueryAndSiteSettingsServiceInstance"}
-                    $searchQueryAndSiteSettingsService = $searchQueryAndSiteSettingsServices | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+                    $searchQueryAndSiteSettingsService = $searchQueryAndSiteSettingsServices | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
                     If (-not $?) { Throw " - Failed to find Search Query and Site Settings service instance" }
                     # Start Service instance
                     Write-Host -ForegroundColor White " - Starting Search Query and Site Settings Service Instance..."
@@ -3680,7 +3879,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                             Write-Host -ForegroundColor Blue "." -NoNewline
                             Start-Sleep 1
                             $searchQueryAndSiteSettingsServices = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Server.Search.Administration.SearchQueryAndSiteSettingsServiceInstance"}
-                            $searchQueryAndSiteSettingsService = $searchQueryAndSiteSettingsServices | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+                            $searchQueryAndSiteSettingsService = $searchQueryAndSiteSettingsServices | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
                         }
                         Write-Host -BackgroundColor Blue -ForegroundColor Black $($searchQueryAndSiteSettingsService.Status)
                     }
@@ -3771,21 +3970,21 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
         {
             $svcConfig.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication | ForEach-Object {
                 $appConfig = $_
-                If (($appConfig.DatabaseServer -ne "") -and ($appConfig.DatabaseServer -ne $null))
+                If (!([string]::IsNullOrEmpty($appConfig.Database.DBServer)))
                 {
-                    $dbServer = $appConfig.DatabaseServer
+                    $dbServer = $appConfig.Database.DBServer
                 }
                 Else
                 {
                     $dbServer = $xmlinput.Configuration.Farm.Database.DBServer
                 }
-                $installAdminComponent = (($appConfig.AdminComponent.Server | where {$_.Name -eq $env:computername}) -ne $null)
-                $installCrawlComponent = (($appConfig.CrawlComponent.Server | where {$_.Name -eq $env:computername}) -ne $null)
-                $installQueryComponent = (($appConfig.QueryComponent.Server | where {$_.Name -eq $env:computername}) -ne $null)
-                $installSyncSvc = (($appConfig.SearchQueryAndSiteSettingsServers.Server | where {$_.Name -eq $env:computername}) -ne $null)
-                $installAnalyticsProcessingComponent = (($appConfig.AnalyticsProcessingComponent.Server | where {$_.Name -eq $env:computername}) -ne $null)
-                $installContentProcessingComponent = (($appConfig.ContentProcessingComponent.Server | where {$_.Name -eq $env:computername}) -ne $null)
-                $installIndexComponent = (($appConfig.IndexComponent.Server | where {$_.Name -eq $env:computername}) -ne $null)
+                $installAdminComponent = (($appConfig.AdminComponent.Server | where {MatchComputerName $_.Name $env:COMPUTERNAME}) -ne $null)
+                $installCrawlComponent = (($appConfig.CrawlComponent.Server | where {MatchComputerName $_.Name $env:COMPUTERNAME}) -ne $null)
+                $installQueryComponent = (($appConfig.QueryComponent.Server | where {MatchComputerName $_.Name $env:COMPUTERNAME}) -ne $null)
+                $installSyncSvc = (($appConfig.SearchQueryAndSiteSettingsServers.Server | where {MatchComputerName $_.Name $env:COMPUTERNAME}) -ne $null)
+                $installAnalyticsProcessingComponent = (($appConfig.AnalyticsProcessingComponent.Server | where {MatchComputerName $_.Name $env:COMPUTERNAME}) -ne $null)
+                $installContentProcessingComponent = (($appConfig.ContentProcessingComponent.Server | where {MatchComputerName $_.Name $env:COMPUTERNAME}) -ne $null)
+                $installIndexComponent = (($appConfig.IndexComponent.Server | where {MatchComputerName $_.Name $env:COMPUTERNAME}) -ne $null)
 
                 $pool = Get-ApplicationPool $appConfig.ApplicationPool
                 $adminPool = Get-ApplicationPool $appConfig.AdminComponent.ApplicationPool
@@ -3813,6 +4012,20 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
 
                     New-SPServiceApplicationPool -Name $pool -Account $appPoolAccount -ErrorAction SilentlyContinue | Out-Null
                 }
+
+                # From http://mmman.itgroove.net/2012/12/search-host-controller-service-in-starting-state-sharepoint-2013-8/
+                # And http://blog.thewulph.com/?p=374
+                Write-Host -ForegroundColor White "  - Fixing registry permissions for Search Host Controller Service..." -NoNewline
+                $acl = Get-Acl HKLM:\System\CurrentControlSet\Control\ComputerName
+                $person = [System.Security.Principal.NTAccount] "WSS_WPG" # Trimmed down from the original "Users"
+                $access = [System.Security.AccessControl.RegistryRights]::FullControl
+                $inheritance = [System.Security.AccessControl.InheritanceFlags] "ContainerInherit, ObjectInherit"
+                $propagation = [System.Security.AccessControl.PropagationFlags]::None
+                $type = [System.Security.AccessControl.AccessControlType]::Allow
+                $rule = New-Object System.Security.AccessControl.RegistryAccessRule($person, $access, $inheritance, $propagation, $type)
+                $acl.AddAccessRule($rule)  
+                Set-Acl HKLM:\System\CurrentControlSet\Control\ComputerName $acl
+                Write-Host -ForegroundColor White "Done."
 
                 Write-Host -ForegroundColor White "  - Checking Search Service Instance..." -NoNewline
                 If ($searchSvc.Status -eq "Disabled")
@@ -3852,7 +4065,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                     Write-Host -ForegroundColor White "Creating $($appConfig.Name)..." -NoNewline
                     $searchApp = New-SPEnterpriseSearchServiceApplication -Name $appConfig.Name `
                         -DatabaseServer $dbServer `
-                        -DatabaseName $($dbPrefix+$appConfig.DatabaseName) `
+                        -DatabaseName $($dbPrefix+$appConfig.Database.Name) `
                         -FailoverDatabaseServer $appConfig.FailoverDatabaseServer `
                         -ApplicationPool $pool `
                         -AdminApplicationPool $adminPool `
@@ -3893,7 +4106,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                 $adminComponents = $clone.GetComponents() | Where-Object {$_.Name -like "AdminComponent*"}
                 If ($installAdminComponent)
                 {
-                    if (!($adminComponents | Where-Object {$_.ServerName -eq $env:COMPUTERNAME}))
+                    if (!($adminComponents | Where-Object {MatchComputerName $_.ServerName $env:COMPUTERNAME}))
                     {
                         Write-Host -ForegroundColor White "Creating..." -NoNewline
                         New-SPEnterpriseSearchAdminComponent –SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
@@ -3913,7 +4126,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                 $contentProcessingComponents = $clone.GetComponents() | Where-Object {$_.Name -like "ContentProcessingComponent*"}
                 if ($installContentProcessingComponent)
                 {
-                    if (!($contentProcessingComponents | Where-Object {$_.ServerName -eq $env:COMPUTERNAME}))
+                    if (!($contentProcessingComponents | Where-Object {MatchComputerName $_.ServerName $env:COMPUTERNAME}))
                     {
                         Write-Host -ForegroundColor White "Creating..." -NoNewline
                         New-SPEnterpriseSearchContentProcessingComponent –SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
@@ -3933,7 +4146,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                 $analyticsProcessingComponents = $clone.GetComponents() | Where-Object {$_.Name -like "AnalyticsProcessingComponent*"}
                 if ($installAnalyticsProcessingComponent)
                 {
-                    if (!($analyticsProcessingComponents | Where-Object {$_.ServerName -eq $env:COMPUTERNAME}))
+                    if (!($analyticsProcessingComponents | Where-Object {MatchComputerName $_.ServerName $env:COMPUTERNAME}))
                     {
                         Write-Host -ForegroundColor White "Creating..." -NoNewline
                         New-SPEnterpriseSearchAnalyticsProcessingComponent –SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
@@ -3953,7 +4166,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                 $crawlComponents = $clone.GetComponents() | Where-Object {$_.Name -like "CrawlComponent*"}
                 if ($installCrawlComponent)
                 {
-                    if (!($crawlComponents | Where-Object {$_.ServerName -eq $env:COMPUTERNAME}))
+                    if (!($crawlComponents | Where-Object {MatchComputerName $_.ServerName $env:COMPUTERNAME}))
                     {
                         Write-Host -ForegroundColor White "Creating..." -NoNewline
                         New-SPEnterpriseSearchCrawlComponent –SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
@@ -3973,7 +4186,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                 $indexingComponents = $clone.GetComponents() | Where-Object {$_.Name -like "IndexComponent*"}
                 if ($installIndexComponent)
                 {
-                    if (!($indexingComponents | Where-Object {$_.ServerName -eq $env:COMPUTERNAME}))
+                    if (!($indexingComponents | Where-Object {MatchComputerName $_.ServerName $env:COMPUTERNAME}))
                     {
                         Write-Host -ForegroundColor White "Creating..." -NoNewline
                         # Specify the RootDirectory parameter only if it's different than the default path
@@ -3997,7 +4210,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                 $queryComponents = $clone.GetComponents() | Where-Object {$_.Name -like "QueryProcessingComponent*"}
                 if ($installQueryComponent)
                 {
-                    if (!($queryComponents | Where-Object {$_.ServerName -eq $env:COMPUTERNAME}))
+                    if (!($queryComponents | Where-Object {MatchComputerName $_.ServerName $env:COMPUTERNAME}))
                     {
                         Write-Host -ForegroundColor White "Creating..." -NoNewline
                         New-SPEnterpriseSearchQueryProcessingComponent –SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
@@ -4070,6 +4283,22 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                 }
                 Else {Write-Host -ForegroundColor White "Already exists."}
 
+                # Check the Search Host Controller Service for a known issue ("stuck on starting")
+                Write-Host -ForegroundColor White "  - Checking for stuck Search Host Controller Service (known issue)..."
+                $searchHostServices = Get-SPServiceInstance | ? {$_.TypeName -eq "Search Host Controller Service"}
+                foreach ($sh in $searchHostServices)
+                {
+                    Write-Host -ForegroundColor White "   - Server: $($sh.Parent.Address)..." -NoNewline
+                    if ($sh.Status -eq "Provisioning")
+                    {
+                        Write-Host -ForegroundColor White "Re-provisioning..." -NoNewline
+                        $sh.Unprovision()
+                        $sh.Provision($true)
+                        Write-Host -ForegroundColor White "Done."
+                    }
+                    else {Write-Host -ForegroundColor White "OK."}
+                }
+                
                 # Add link to resources list
                 AddResourcesLink "Search Administration" ("searchadministration.aspx?appid=" +  $searchApp.Id)
 
@@ -4123,19 +4352,28 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
         Start-Process -FilePath net.exe -ArgumentList "share $pathToShare `"/GRANT:WSS_WPG,CHANGE`"" -NoNewWindow -Wait -ErrorAction SilentlyContinue
 
         # Set the crawl start addresses (including the elusive sps3:// URL required for People Search, if My Sites are provisioned)
-        $crawlStartAddresses = $portalURL+":"+$portalPort
-        # Updated to include all web apps, not just main Portal and MySites host
-        ForEach ($webAppConfig in $xmlinput.Configuration.WebApplications.WebApplication | Where-Object {$_.Url -ne $portalURL -and $_.Url -ne $mySiteURL})
+        # Updated to include all web apps and host-named site collections, not just main Portal and MySites host
+        ForEach ($webAppConfig in $xmlinput.Configuration.WebApplications.WebApplication)
         {
-            $crawlStartAddresses += ","+$($webAppConfig.url)+":"+$($webAppConfig.Port)
+            if ([string]::IsNullOrEmpty($crawlStartAddresses))
+            {
+                $crawlStartAddresses = $($webAppConfig.url)+":"+$($webAppConfig.Port)
+            }
+            else
+            {
+                $crawlStartAddresses += ","+$($webAppConfig.url)+":"+$($webAppConfig.Port)
+            }
+            foreach ($siteCollectionConfig in $webAppConfig.SiteCollections.SiteCollection | Where-Object {$_.HostNamedSiteCollection -eq $true})
+            {
+                $crawlStartAddresses += ","+$($siteCollectionConfig.siteUrl)
+            }
         }
-
         If ($mySiteURL -and $mySitePort -and $mySiteHostHeader)
         {
         	# Need to set the correct sps (People Search) URL protocol in case My Sites are SSL-bound
         	If ($mySiteURL -like "https*") {$peopleSearchProtocol = "sps3s://"}
         	Else {$peopleSearchProtocol = "sps3://"}
-        	$crawlStartAddresses += ","+$mySiteURL+":"+$mySitePort+","+$peopleSearchProtocol+$mySiteHostHeader+":"+$mySitePort
+        	$crawlStartAddresses += ","+$peopleSearchProtocol+$mySiteHostHeader+":"+$mySitePort
         }
         Write-Host -ForegroundColor White " - Setting up crawl addresses for default content source..." -NoNewline
         Get-SPEnterpriseSearchServiceApplication | Get-SPEnterpriseSearchCrawlContentSource | Set-SPEnterpriseSearchCrawlContentSource -StartAddresses $crawlStartAddresses
@@ -4147,9 +4385,13 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
             $centralAdminUrl = $ca.Url
             if ($ca.Url -like "http://*" -or $ca.Url -like "*$($env:COMPUTERNAME)*") # If Central Admin uses SSL, only attempt the web request if we're on the same server as Central Admin, otherwise it may throw a certificate error due to our self-signed cert
             {
-                Write-Host -ForegroundColor White " - Requesting searchfarmdashboard.aspx (resolves Health Analyzer error)..." -NoNewLine
-                $null = Invoke-WebRequest -Uri $centralAdminUrl"searchfarmdashboard.aspx" -UseDefaultCredentials -DisableKeepAlive -UseBasicParsing -ErrorAction SilentlyContinue
-                Write-Host "Done."
+                try
+                {
+                    Write-Host -ForegroundColor White " - Requesting searchfarmdashboard.aspx (resolves Health Analyzer error)..." -NoNewLine
+                    $null = Invoke-WebRequest -Uri $centralAdminUrl"searchfarmdashboard.aspx" -UseDefaultCredentials -DisableKeepAlive -UseBasicParsing -ErrorAction SilentlyContinue
+                    Write-Host "Done."
+                }
+                catch {}
             }
         }
     }
@@ -4285,7 +4527,7 @@ Function Get-ApplicationPool([System.Xml.XmlElement]$appPoolConfig) {
 # ===================================================================================
 Function CreateBusinessDataConnectivityServiceApp([xml]$xmlinput)
 {
-    If (ShouldIProvision($xmlinput.Configuration.ServiceApps.BusinessDataConnectivity) -eq $true)
+    If (ShouldIProvision $xmlinput.Configuration.ServiceApps.BusinessDataConnectivity -eq $true)
     {
         WriteLine
         Try
@@ -4304,7 +4546,7 @@ Function CreateBusinessDataConnectivityServiceApp([xml]$xmlinput)
             Write-Host -ForegroundColor White " - Checking local service instance..."
             # Get the service instance
             $bdcServiceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.BusinessData.SharedService.BdcServiceInstance"}
-            $bdcServiceInstance = $bdcServiceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+            $bdcServiceInstance = $bdcServiceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
             If (-not $?) { Throw " - Failed to find the service instance" }
             # Start Service instances
             If($bdcServiceInstance.Status -eq "Disabled")
@@ -4319,7 +4561,7 @@ Function CreateBusinessDataConnectivityServiceApp([xml]$xmlinput)
                     Write-Host -ForegroundColor Blue "." -NoNewline
                     Start-Sleep 1
                     $bdcServiceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.SharePoint.BusinessData.SharedService.BdcServiceInstance"}
-                    $bdcServiceInstance = $bdcServiceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+                    $bdcServiceInstance = $bdcServiceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
                 }
                 Write-Host -BackgroundColor Blue -ForegroundColor Black ($bdcServiceInstance.Status)
             }
@@ -4365,7 +4607,7 @@ Function CreateWordAutomationServiceApp ([xml]$xmlinput)
         $dbServer = $xmlinput.Configuration.Farm.Database.DBServer
     }
     $serviceDB = $dbPrefix+$($serviceConfig.Database.Name)
-    If (ShouldIProvision($serviceConfig) -eq $true)
+    If (ShouldIProvision $serviceConfig -eq $true)
     {
         WriteLine
         $serviceInstanceType = "Microsoft.Office.Word.Server.Service.WordServiceInstance"
@@ -4393,7 +4635,7 @@ Function CreateWordAutomationServiceApp ([xml]$xmlinput)
 Function CreateExcelServiceApp ([xml]$xmlinput)
 {
     $officeServerPremium = $xmlinput.Configuration.Install.SKU -replace "Enterprise","1" -replace "Standard","0"
-    If (ShouldIProvision($xmlinput.Configuration.EnterpriseServiceApps.ExcelServices) -eq $true)
+    If (ShouldIProvision $xmlinput.Configuration.EnterpriseServiceApps.ExcelServices -eq $true)
     {
         WriteLine
         if ($officeServerPremium -eq "1")
@@ -4409,7 +4651,7 @@ Function CreateExcelServiceApp ([xml]$xmlinput)
                 Write-Host -ForegroundColor White " - Checking local service instance..."
                 # Get the service instance
                 $excelServiceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Excel.Server.MossHost.ExcelServerWebServiceInstance"}
-                $excelServiceInstance = $excelServiceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+                $excelServiceInstance = $excelServiceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
                 If (-not $?) { Throw " - Failed to find the service instance" }
                 # Start Service instances
                 If($excelServiceInstance.Status -eq "Disabled")
@@ -4424,7 +4666,7 @@ Function CreateExcelServiceApp ([xml]$xmlinput)
                         Write-Host -ForegroundColor Blue "." -NoNewline
                         Start-Sleep 1
                         $excelServiceInstances = Get-SPServiceInstance | ? {$_.GetType().ToString() -eq "Microsoft.Office.Excel.Server.MossHost.ExcelServerWebServiceInstance"}
-                        $excelServiceInstance = $excelServiceInstances | ? {$_.Server.Address -eq $env:COMPUTERNAME}
+                        $excelServiceInstance = $excelServiceInstances | ? {MatchComputerName $_.Server.Address $env:COMPUTERNAME}
                     }
                     Write-Host -BackgroundColor Blue -ForegroundColor Black ($excelServiceInstance.Status)
                 }
@@ -4549,7 +4791,7 @@ Function CreateVisioServiceApp ([xml]$xmlinput)
 {
     $officeServerPremium = $xmlinput.Configuration.Install.SKU -replace "Enterprise","1" -replace "Standard","0"
     $serviceConfig = $xmlinput.Configuration.EnterpriseServiceApps.VisioService
-    If (ShouldIProvision($serviceConfig) -eq $true)
+    If (ShouldIProvision $serviceConfig -eq $true)
     {
         WriteLine
         if ($officeServerPremium -eq "1")
@@ -4654,7 +4896,7 @@ Function CreatePerformancePointServiceApp ([xml]$xmlinput)
 {
     $officeServerPremium = $xmlinput.Configuration.Install.SKU -replace "Enterprise","1" -replace "Standard","0"
     $serviceConfig = $xmlinput.Configuration.EnterpriseServiceApps.PerformancePointService
-    If (ShouldIProvision($serviceConfig) -eq $true)
+    If (ShouldIProvision $serviceConfig -eq $true)
     {
         WriteLine
         if ($officeServerPremium -eq "1")
@@ -4732,7 +4974,7 @@ Function CreateAccess2010ServiceApp ([xml]$xmlinput)
 {
     $officeServerPremium = $xmlinput.Configuration.Install.SKU -replace "Enterprise","1" -replace "Standard","0"
     $serviceConfig = $xmlinput.Configuration.EnterpriseServiceApps.AccessService
-    If (ShouldIProvision($serviceConfig) -eq $true)
+    If (ShouldIProvision $serviceConfig -eq $true)
     {
         WriteLine
         if ($officeServerPremium -eq "1")
@@ -4762,7 +5004,7 @@ Function CreateAccess2010ServiceApp ([xml]$xmlinput)
 Function CreateExcelOWAServiceApp ([xml]$xmlinput)
 {
     $serviceConfig = $xmlinput.Configuration.OfficeWebApps.ExcelService
-    If ((ShouldIProvision($serviceConfig) -eq $true) -and (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\$env:spVer\TEMPLATE\FEATURES\OfficeWebApps\feature.xml"))
+    If ((ShouldIProvision $serviceConfig -eq $true) -and (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\$env:spVer\TEMPLATE\FEATURES\OfficeWebApps\feature.xml"))
     {
         WriteLine
         $portalWebApp = $xmlinput.Configuration.WebApplications.WebApplication | Where {$_.Type -eq "Portal"}
@@ -4790,7 +5032,7 @@ Function CreateExcelOWAServiceApp ([xml]$xmlinput)
 Function CreatePowerPointOWAServiceApp ([xml]$xmlinput)
 {
     $serviceConfig = $xmlinput.Configuration.OfficeWebApps.PowerPointService
-    If ((ShouldIProvision($serviceConfig) -eq $true) -and (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\$env:spVer\TEMPLATE\FEATURES\OfficeWebApps\feature.xml"))
+    If ((ShouldIProvision $serviceConfig -eq $true) -and (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\$env:spVer\TEMPLATE\FEATURES\OfficeWebApps\feature.xml"))
     {
         WriteLine
         If ($env:spVer -eq "14") {$serviceInstanceType = "Microsoft.Office.Server.PowerPoint.SharePoint.Administration.PowerPointWebServiceInstance"}
@@ -4809,7 +5051,7 @@ Function CreatePowerPointOWAServiceApp ([xml]$xmlinput)
 Function CreateWordViewingOWAServiceApp ([xml]$xmlinput)
 {
     $serviceConfig = $xmlinput.Configuration.OfficeWebApps.WordViewingService
-    If ((ShouldIProvision($serviceConfig) -eq $true) -and (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\$env:spVer\TEMPLATE\FEATURES\OfficeWebApps\feature.xml"))
+    If ((ShouldIProvision $serviceConfig -eq $true) -and (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\$env:spVer\TEMPLATE\FEATURES\OfficeWebApps\feature.xml"))
     {
         WriteLine
         $serviceInstanceType = "Microsoft.Office.Web.Environment.Sharepoint.ConversionServiceInstance"
@@ -4831,7 +5073,7 @@ Function CreateWordViewingOWAServiceApp ([xml]$xmlinput)
 Function CreateAppManagementServiceApp ([xml]$xmlinput)
 {
     $serviceConfig = $xmlinput.Configuration.ServiceApps.AppManagementService
-    If (ShouldIProvision($serviceConfig) -eq $true)
+    If (ShouldIProvision $serviceConfig -eq $true)
     {
         WriteLine
 	    # If we haven't specified a DB Server then just use the default used by the Farm
@@ -4866,7 +5108,7 @@ Function CreateAppManagementServiceApp ([xml]$xmlinput)
 Function CreateSubscriptionSettingsServiceApp ([xml]$xmlinput)
 {
     $serviceConfig = $xmlinput.Configuration.ServiceApps.SubscriptionSettingsService
-    If (ShouldIProvision($serviceConfig) -eq $true)
+    If (ShouldIProvision $serviceConfig -eq $true)
     {
         WriteLine
 	    # If we haven't specified a DB Server then just use the default used by the Farm
@@ -4912,7 +5154,7 @@ Function CreateAccessServicesApp ([xml]$xmlinput)
     }
     $serviceDB = $dbPrefix+$($serviceConfig.Database.Name)
     $serviceConfig = $xmlinput.Configuration.EnterpriseServiceApps.AccessServices
-    If (ShouldIProvision($serviceConfig) -eq $true)
+    If (ShouldIProvision $serviceConfig -eq $true)
     {
         WriteLine
         if ($officeServerPremium -eq "1")
@@ -4941,7 +5183,7 @@ Function CreateAccessServicesApp ([xml]$xmlinput)
 Function CreatePowerPointConversionServiceApp ([xml]$xmlinput)
 {
     $serviceConfig = $xmlinput.Configuration.ServiceApps.PowerPointConversionService
-    If (ShouldIProvision($serviceConfig) -eq $true)
+    If (ShouldIProvision $serviceConfig -eq $true)
     {
         WriteLine
         $serviceInstanceType = "Microsoft.Office.Server.PowerPoint.Administration.PowerPointConversionServiceInstance"
@@ -4972,7 +5214,7 @@ Function CreateMachineTranslationServiceApp ([xml]$xmlinput)
         $dbServer = $xmlinput.Configuration.Farm.Database.DBServer
     }
     $translationDatabase = $dbPrefix+$($serviceConfig.Database.Name)
-    If (ShouldIProvision($serviceConfig) -eq $true)
+    If (ShouldIProvision $serviceConfig -eq $true)
     {
         WriteLine
         $serviceInstanceType = "Microsoft.Office.TranslationServices.TranslationServiceInstance"
@@ -4993,7 +5235,7 @@ Function CreateMachineTranslationServiceApp ([xml]$xmlinput)
 Function CreateWorkManagementServiceApp ([xml]$xmlinput)
 {
     $serviceConfig = $xmlinput.Configuration.ServiceApps.WorkManagementService
-    If (ShouldIProvision($serviceConfig) -eq $true)
+    If (ShouldIProvision $serviceConfig -eq $true)
     {
         WriteLine
         $serviceInstanceType = "Microsoft.Office.Server.WorkManagement.WorkManagementServiceInstance"
@@ -5037,6 +5279,28 @@ Function ConfigureOutgoingEmail
 }
 #EndRegion
 
+#Region Configure Incoming Email
+Function ConfigureIncomingEmail
+{
+    # Ensure the node exists in the XML first as we don't want to inadvertently disable the service if it wasn't explicitly specified
+    if (($xmlinput.Configuration.Farm.Services.SelectSingleNode("IncomingEmail")) -and !(ShouldIProvision $xmlinput.Configuration.Farm.Services.IncomingEmail))
+    {
+        StopServiceInstance "Microsoft.SharePoint.Administration.SPIncomingEmailServiceInstance"
+    }
+}
+#EndRegion
+
+#Region Configure Foundation Web Application Service
+Function ConfigureFoundationWebApplicationService
+{
+    # Ensure the node exists in the XML first as we don't want to inadvertently disable the service if it wasn't explicitly specified
+    if (($xmlinput.Configuration.Farm.Services.SelectSingleNode("FoundationWebApplication")) -and !(ShouldIProvision $xmlinput.Configuration.Farm.Services.FoundationWebApplication))
+    {
+        StopServiceInstance "Microsoft.SharePoint.Administration.SPWebServiceInstance"
+    }
+}
+#EndRegion
+
 #Region Configure Adobe PDF Indexing and Display
 # ====================================================================================
 # Func: Configure-PDFSearchAndIcon
@@ -5052,7 +5316,7 @@ Function Configure-PDFSearchAndIcon
     $sharePointRoot = "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\$env:spVer"
     $sourceFileLocations = @("$bits\$spYear\PDF\","$bits\PDF\","$bits\AdobePDF\","$((Get-Item $env:TEMP).FullName)\")
     # Only install/configure iFilter if specified, and we are running SP2010 (as SP2013 includes one)
-    If ((ShouldIProvision($xmlinput.Configuration.AdobePDF.iFilter) -eq $true) -and ($env:spVer -eq "14"))
+    If ((ShouldIProvision $xmlinput.Configuration.AdobePDF.iFilter -eq $true) -and ($env:spVer -eq "14"))
     {
         $pdfIfilterUrl = "http://download.adobe.com/pub/adobe/acrobat/win/9.x/PDFiFilter64installer.zip"
         Write-Host -ForegroundColor White " - Configuring PDF file iFilter and indexing..."
@@ -5241,7 +5505,7 @@ Function Configure-PDFSearchAndIcon
 # ====================================================================================
 Function InstallForeFront
 {
-    If (ShouldIProvision($xmlinput.Configuration.ForeFront) -eq $true)
+    If (ShouldIProvision $xmlinput.Configuration.ForeFront -eq $true)
     {
         WriteLine
         If (Test-Path "$env:PROGRAMFILES\Microsoft ForeFront Protection for SharePoint\Launcher.exe")
@@ -5385,7 +5649,7 @@ Function Install-NetFramework ($server, $password)
         $session = New-PSSession -Name "AutoSPInstallerSession-$server" -Authentication Credssp -Credential $credential -ComputerName $server
     }
     $remoteQueryOS = Invoke-Command -ScriptBlock {Get-WmiObject Win32_OperatingSystem} -Session $session
-	If (!($remoteQueryOS.Version.Contains("6.2"))) # Only perform the stuff below if we aren't on Windows 2012
+	If (!($remoteQueryOS.Version.Contains("6.2")) -and !($remoteQueryOS.Version.Contains("6.3"))) # Only perform the stuff below if we aren't on Windows 2012 or 2012 R2
 	{
 	    Write-Host -ForegroundColor White " - Pre-installing .Net Framework feature on $server..."
 	    Invoke-Command -ScriptBlock {Import-Module ServerManager | Out-Null
@@ -5414,7 +5678,7 @@ Function Install-WindowsIdentityFoundation ($server, $password)
         $session = New-PSSession -Name "AutoSPInstallerSession-$server" -Authentication Credssp -Credential $credential -ComputerName $server
     }
     $remoteQueryOS = Invoke-Command -ScriptBlock {Get-WmiObject Win32_OperatingSystem} -Session $session
-	If (!($remoteQueryOS.Version.Contains("6.2"))) # Only perform the stuff below if we aren't on Windows 2012
+	If (!($remoteQueryOS.Version.Contains("6.2")) -and !($remoteQueryOS.Version.Contains("6.3"))) # Only perform the stuff below if we aren't on Windows 2012 or 2012 R2
 	{
 	    Write-Host -ForegroundColor White " - Checking for KB974405 (Windows Identity Foundation)..." -NoNewline
 	    $wifHotfixInstalled = Invoke-Command -ScriptBlock {Get-HotFix -Id KB974405 -ErrorAction SilentlyContinue} -Session $session
@@ -5488,9 +5752,24 @@ Function Start-RemoteInstaller ($server, $password, $inputFile)
     Remove-PSSession $session
 }
 
+# ====================================================================================
+# Func: Confirm-LocalSession
+# Desc: Returns $false if we are running over a PS remote session, $true otherwise
+# From: Brian Lalancette, 2012
+# ====================================================================================
+
+Function Confirm-LocalSession
+{
+    # Another way
+    # If ((Get-Process -Id $PID).ProcessName -eq "wsmprovhost") {Return $false}
+    If ($Host.Name -eq "ServerRemoteHost") {Return $false}
+    Else {Return $true}
+}
+
 #EndRegion
 
 #Region Miscellaneous/Utility Functions
+#Region Load Snapins
 # ===================================================================================
 # Func: Load SharePoint Powershell Snapin
 # Desc: Load SharePoint Powershell Snapin
@@ -5507,7 +5786,42 @@ Function Load-SharePoint-Powershell
         WriteLine
     }
 }
+# ====================================================================================
+# Func: ImportWebAdministration
+# Desc: Load IIS WebAdministration Snapin/Module
+# From: Inspired by http://stackoverflow.com/questions/1924217/powershell-load-webadministration-in-ps1-script-on-both-iis-7-and-iis-7-5
+# ====================================================================================
+Function ImportWebAdministration
+{
+    $queryOS = Gwmi Win32_OperatingSystem
+    $queryOS = $queryOS.Version
+    Try
+    {
+        If ($queryOS.Contains("6.0")) # Win2008
+        {
+            If (!(Get-PSSnapin WebAdministration -ErrorAction SilentlyContinue))
+            {
+                If (!(Test-Path $env:ProgramFiles\IIS\PowerShellSnapin\IIsConsole.psc1))
+                {
+                    Start-Process -Wait -NoNewWindow -FilePath msiexec.exe -ArgumentList "/i `"$env:SPbits\PrerequisiteInstallerFiles\iis7psprov_x64.msi`" /passive /promptrestart"
+                }
+                Add-PSSnapin WebAdministration
+            }
+        }
+        Else # Win2008R2 or Win2012
+        {
+            Import-Module WebAdministration
+        }
+    }
+    Catch
+    {
+        Throw " - Could not load IIS Administration module."
 
+    }
+}
+#EndRegion
+
+#Region ConvertTo-PlainText
 # ===================================================================================
 # Func: ConvertTo-PlainText
 # Desc: Convert string to secure phrase
@@ -5519,36 +5833,9 @@ Function ConvertTo-PlainText( [security.securestring]$secure )
     $marshal = [Runtime.InteropServices.Marshal]
     $marshal::PtrToStringAuto( $marshal::SecureStringToBSTR($secure) )
 }
+#EndRegion
 
-# ===================================================================================
-# Func: Pause
-# Desc: Wait for user to press a key - normally used after an error has occured or input is required
-# ===================================================================================
-Function Pause($action, $key)
-{
-    # From http://www.microsoft.com/technet/scriptcenter/resources/pstips/jan08/pstip0118.mspx
-    if ($key -eq "any" -or ([string]::IsNullOrEmpty($key)))
-    {
-        $actionString = "Press any key to $action..."
-        if (-not $unattended)
-        {
-            Write-Host $actionString
-            $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-        }
-        else
-        {
-            Write-Host "Skipping pause due to -unattended switch: $actionString"
-        }
-    }
-    else
-    {
-        $actionString = "Enter `"$key`" to $action"
-        $continue = Read-Host -Prompt $actionString
-        if ($continue -ne $key) {pause $action $key}
-
-    }
-}
-
+#Region ShouldIProvision
 # ===================================================================================
 # Func: ShouldIProvision
 # Desc: Returns TRUE if the item whose configuration node is passed in should be provisioned.
@@ -5571,7 +5858,9 @@ Function ShouldIProvision([System.Xml.XmlNode] $node)
     If ($v -eq $true) { Return $true; }
     Return MatchComputerName $v $env:COMPUTERNAME
 }
+#EndRegion
 
+#Region SQL Stuff
 # ====================================================================================
 # Func: Add-SQLAlias
 # Desc: Creates a local SQL alias (like using cliconfg.exe) so the real SQL server/name doesn't get hard-coded in SharePoint
@@ -5610,7 +5899,7 @@ Function Add-SQLAlias()
         [String]$port = ""
     )
 
-	If (($SQLInstance -eq $env:COMPUTERNAME) -or ($SQLInstance.StartsWith($env:ComputerName +"\"))) {
+	If ((MatchComputerName $SQLInstance $env:COMPUTERNAME) -or ($SQLInstance.StartsWith($env:ComputerName +"\"))) {
 		$protocol = "dbmslpcn"
 	}
 	else {
@@ -5675,7 +5964,7 @@ Function CheckSQLAccess
     $serverRolesToCheck = "dbcreator","securityadmin"
     # If we are provisioning PerformancePoint but aren't running SharePoint 2010 Service Pack 1 yet, we need sysadmin in order to run the RenameDatabase function
     # We also evidently need sysadmin in order to configure MaxDOP on the SQL instance if we are installing SharePoint 2013
-    If (($xmlinput.Configuration.EnterpriseServiceApps.PerformancePointService) -and (ShouldIProvision ($xmlinput.Configuration.EnterpriseServiceApps.PerformancePointService) -eq $true) -and (!(CheckForSP1)))
+    If (($xmlinput.Configuration.EnterpriseServiceApps.PerformancePointService) -and (ShouldIProvision $xmlinput.Configuration.EnterpriseServiceApps.PerformancePointService -eq $true) -and (!(CheckForSP1)))
     {
         $serverRolesToCheck += "sysadmin"
     }
@@ -5826,16 +6115,9 @@ drop table #opt
     $objSQLCommand.ExecuteNonQuery()
     $objSQLConnection.Close()
 }
+#EndRegion
 
-# ====================================================================================
-# Func: WriteLine
-# Desc: Writes a nice line of dashes across the screen
-# ====================================================================================
-Function WriteLine
-{
-    Write-Host -ForegroundColor White "--------------------------------------------------------------"
-}
-
+#Region Run-HealthAnalyzerJobs
 # ====================================================================================
 # Func: Run-HealthAnalyzerJobs
 # Desc: Runs all Health Analyzer Timer Jobs Immediately
@@ -5850,14 +6132,16 @@ Function Run-HealthAnalyzerJobs
         $job.RunNow()
     }
 }
+#EndRegion
 
+#Region InstallSMTP
 # ====================================================================================
 # Func: InstallSMTP
 # Desc: Installs the SMTP Server Windows feature
 # ====================================================================================
 Function InstallSMTP
 {
-    If (ShouldIProvision($xmlinput.Configuration.Farm.Services.SMTP) -eq $true)
+    If (ShouldIProvision $xmlinput.Configuration.Farm.Services.SMTP -eq $true)
     {
         WriteLine
         Write-Host -ForegroundColor White " - Installing SMTP Server feature..."
@@ -5877,13 +6161,21 @@ Function InstallSMTP
             Add-WindowsFeature -Name SMTP-Server | Out-Null
             # Restore progress preference
             $ProgressPreference = $pref
-            If (!($?)) {Throw " - Failed to install SMTP Server!"}
+            If (!$?) {Throw " - Failed to install SMTP Server!"}
+            else
+            {
+                # Need to set the newly-installed service to Automatic since it is set to Manual by default (per https://autospinstaller.codeplex.com/workitem/19744)
+                Write-Host -ForegroundColor White "  - Setting SMTP service startup type to Automatic..."
+                Set-Service SMTPSVC -StartupType Automatic -ErrorAction SilentlyContinue
+            }
         }
         Write-Host -ForegroundColor White " - Done."
         WriteLine
     }
 }
+#EndRegion
 
+#Region FixTaxonomyPickerBug
 # ====================================================================================
 # Func: FixTaxonomyPickerBug
 # Desc: Renames the TaxonomyPicker.ascx file which doesn't seem to be used anyhow
@@ -5901,7 +6193,9 @@ Function FixTaxonomyPickerBug
         WriteLine
     }
 }
+#EndRegion
 
+#Region Miscellaneous Checks
 # ====================================================================================
 # Func: CheckForSP1
 # Desc: Returns $true if the farm build number or SharePoint DLL is at Service Pack 1 (6029) or greater (or if slipstreamed SP1 is detected); otherwise returns $false
@@ -5951,6 +6245,51 @@ Function CheckIfUpgradeNeeded
     }
 }
 
+Function Get-SharePointInstall
+{
+    # Crude way of checking if SharePoint is already installed
+    If (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\$env:spVer\BIN\stsadm.exe")
+    {
+        return $true
+    }
+    Else {return $false}
+}
+
+# ===================================================================================
+# Func: MatchComputerName
+# Desc: Returns TRUE if the $computerName specified matches one of the items in $computersList.
+#		Supports wildcard matching (# for a a number, * for any non whitepace character)
+# ===================================================================================
+Function MatchComputerName($computersList, $computerName)
+{
+	If ($computersList -like "*$computerName*") { Return $true; }
+    foreach ($v in $computersList) {
+      If ($v.Contains("*") -or $v.Contains("#")) {
+            # wildcard processing
+            foreach ($item in -split $v) {
+                $item = $item -replace "#", "[\d]"
+                $item = $item -replace "\*", "[\S]*"
+                if ($computerName -match $item) {return $true;}
+            }
+        }
+    }
+}
+Function GetFromNode([System.Xml.XmlElement]$node, [string] $item)
+{
+    $value = $node.GetAttribute($item)
+    If ($value -eq "")
+    {
+        $child = $node.SelectSingleNode($item);
+        If ($child -ne $null)
+        {
+            Return $child.InnerText;
+        }
+    }
+    Return $value;
+}
+#EndRegion
+
+#Region Manage HOSTS & URLs
 # ====================================================================================
 # Func: AddToHOSTS
 # Desc: This writes URLs to the server's local hosts file and points them to the server itself
@@ -5982,7 +6321,7 @@ Function AddToHOSTS ($hosts)
     # Write the AAMs to the hosts file, unless they already exist.
     ForEach ($hostname in $hosts)
     {
-        If ($file.Contains($hostname))
+        If ($file.Contains(" $hostname") -or $file.Contains("`t$hostname")) # Added check for a space or tab character before the hostname for better exact matching
         {Write-Host -ForegroundColor White " - HOSTS file entry for `"$hostname`" already exists - skipping."}
         Else
         {
@@ -5998,7 +6337,6 @@ Function AddToHOSTS ($hosts)
         Remove-Item $filecopy
     }
 }
-
 # ====================================================================================
 # Func: Add-LocalIntranetURL
 # Desc: Adds a URL to the local Intranet zone (Internet Control Panel) to allow pass-through authentication in Internet Explorer (avoid prompts)
@@ -6016,7 +6354,9 @@ Function Add-LocalIntranetURL ($url)
         New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\Domains\$urlDomain" -Name '*' -value "1" -PropertyType dword -Force | Out-Null
     }
 }
+#EndRegion
 
+#Region File System Functions
 # ====================================================================================
 # Func: CompressFolder
 # Desc: Enables NTFS compression for a given folder
@@ -6057,134 +6397,45 @@ Function EnsureFolder ($path)
             }
         }
 }
+#EndRegion
 
-Function GetFromNode([System.Xml.XmlElement]$node, [string] $item)
+#Region Trivial Functions
+# ===================================================================================
+# Func: Pause
+# Desc: Wait for user to press a key - normally used after an error has occured or input is required
+# ===================================================================================
+Function Pause($action, $key)
 {
-    $value = $node.GetAttribute($item)
-    If ($value -eq "")
+    # From http://www.microsoft.com/technet/scriptcenter/resources/pstips/jan08/pstip0118.mspx
+    if ($key -eq "any" -or ([string]::IsNullOrEmpty($key)))
     {
-        $child = $node.SelectSingleNode($item);
-        If ($child -ne $null)
+        $actionString = "Press any key to $action..."
+        if (-not $unattended)
         {
-            Return $child.InnerText;
+            Write-Host $actionString
+            $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        }
+        else
+        {
+            Write-Host "Skipping pause due to -unattended switch: $actionString"
         }
     }
-    Return $value;
-}
-
-# ====================================================================================
-# Func: ImportWebAdministration
-# Desc: Load IIS WebAdministration Snapin/Module
-# From: Inspired by http://stackoverflow.com/questions/1924217/powershell-load-webadministration-in-ps1-script-on-both-iis-7-and-iis-7-5
-# ====================================================================================
-Function ImportWebAdministration
-{
-    $queryOS = Gwmi Win32_OperatingSystem
-    $queryOS = $queryOS.Version
-    Try
+    else
     {
-        If ($queryOS.Contains("6.0")) # Win2008
-        {
-            If (!(Get-PSSnapin WebAdministration -ErrorAction SilentlyContinue))
-            {
-                If (!(Test-Path $env:ProgramFiles\IIS\PowerShellSnapin\IIsConsole.psc1))
-                {
-                    Start-Process -Wait -NoNewWindow -FilePath msiexec.exe -ArgumentList "/i `"$env:SPbits\PrerequisiteInstallerFiles\iis7psprov_x64.msi`" /passive /promptrestart"
-                }
-                Add-PSSnapin WebAdministration
-            }
-        }
-        Else # Win2008R2 or Win2012
-        {
-            Import-Module WebAdministration
-        }
-    }
-    Catch
-    {
-        Throw " - Could not load IIS Administration module."
+        $actionString = "Enter `"$key`" to $action"
+        $continue = Read-Host -Prompt $actionString
+        if ($continue -ne $key) {pause $action $key}
 
     }
 }
 
 # ====================================================================================
-# Func: AddResourcesLink
-# Desc: Adds an item to the Resources list shown on the Central Admin homepage
-#       $url should be relative to the central admin home page and should not include the leading /
+# Func: WriteLine
+# Desc: Writes a nice line of dashes across the screen
 # ====================================================================================
-
-Function AddResourcesLink([string]$title,[string]$url)
+Function WriteLine
 {
-    $centraladminapp = Get-SPWebApplication -IncludeCentralAdministration | ? {$_.IsAdministrationWebApplication -eq $true}
-    $centraladminurl = $centraladminapp.Url
-    $centraladmin = (Get-SPSite $centraladminurl)
-
-    $item = $centraladmin.RootWeb.Lists["Resources"].Items | Where { $_["URL"] -match ".*, $title" }
-    If ($item -eq $null )
-    {
-        $item = $centraladmin.RootWeb.Lists["Resources"].Items.Add();
-    }
-
-    $url = $centraladminurl + $url + ", $title";
-    $item["URL"] = $url;
-    $item.Update();
-}
-
-# ====================================================================================
-# Func: PinToTaskbar
-# Desc: Pins a program to the taskbar
-# From: http://techibee.com/powershell/pin-applications-to-task-bar-using-powershell/685
-# ====================================================================================
-
-Function PinToTaskbar([string]$application)
-{
-    $shell = New-Object -ComObject "Shell.Application"
-    $folder = $shell.Namespace([System.IO.Path]::GetDirectoryName($application))
-
-    Foreach ($verb in $folder.ParseName([System.IO.Path]::GetFileName($application)).verbs())
-    {
-        If($verb.name.replace("&","") -match "Pin to Taskbar")
-        {
-            $verb.DoIt()
-        }
-    }
-}
-
-# ====================================================================================
-# Func: Get-AdministratorsGroup
-# Desc: Returns the actual (localized) name of the built-in Administrators group
-# From: Proposed by Codeplex user Sheppounet at http://autospinstaller.codeplex.com/discussions/265749
-# ====================================================================================
-
-Function Get-AdministratorsGroup
-{
-    If(!$builtinAdminGroup)
-    {
-        $builtinAdminGroup = (Get-WmiObject -Class Win32_Group -computername $env:COMPUTERNAME -Filter "SID='S-1-5-32-544' AND LocalAccount='True'" -errorAction "Stop").Name
-    }
-    Return $builtinAdminGroup
-}
-
-# ====================================================================================
-# Func: Confirm-LocalSession
-# Desc: Returns $false if we are running over a PS remote session, $true otherwise
-# From: Brian Lalancette, 2012
-# ====================================================================================
-
-Function Confirm-LocalSession
-{
-    # Another way
-    # If ((Get-Process -Id $PID).ProcessName -eq "wsmprovhost") {Return $false}
-    If ($Host.Name -eq "ServerRemoteHost") {Return $false}
-    Else {Return $true}
-}
-Function Get-SharePointInstall
-{
-    # Crude way of checking if SharePoint is already installed
-    If (Test-Path "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\$env:spVer\BIN\stsadm.exe")
-    {
-        return $true
-    }
-    Else {return $false}
+    Write-Host -ForegroundColor White "--------------------------------------------------------------"
 }
 
 # ====================================================================================
@@ -6201,6 +6452,22 @@ Function Show-Progress ($process, $color, $interval)
         Start-Sleep $interval
     }
     Write-Host -ForegroundColor $color "Done."
+}
+#EndRegion
+
+#Region Security-Related
+# ====================================================================================
+# Func: Get-AdministratorsGroup
+# Desc: Returns the actual (localized) name of the built-in Administrators group
+# From: Proposed by Codeplex user Sheppounet at http://autospinstaller.codeplex.com/discussions/265749
+# ====================================================================================
+Function Get-AdministratorsGroup
+{
+    If(!$builtinAdminGroup)
+    {
+        $builtinAdminGroup = (Get-WmiObject -Class Win32_Group -computername $env:COMPUTERNAME -Filter "SID='S-1-5-32-544' AND LocalAccount='True'" -errorAction "Stop").Name
+    }
+    Return $builtinAdminGroup
 }
 
 # ====================================================================================
@@ -6228,24 +6495,68 @@ Function Set-UserAccountControl ($flag)
     }
 }
 
-# ===================================================================================
-# Func: MatchComputerName
-# Desc: Returns TRUE if the $computerName specified matches one of the items in $computersList.
-#		Supports wildcard matching (# for a a number, * for any non whitepace character)
-# ===================================================================================
-Function MatchComputerName($computersList, $computerName)
+# ====================================================================================
+# Func: userExists
+# Desc: "Here is a little powershell function I made to see check if specific active directory users exists or not."
+# From: http://oyvindnilsen.com/powershell-function-to-check-if-active-directory-users-exists/
+# ====================================================================================
+function userExists ([string]$name)
 {
-	If ($computersList -like "*$computerName*") { Return $true; }
-    foreach ($v in $computersList) {
-      If ($v.Contains("*") -or $v.Contains("#")) {
-            # wildcard processing
-            foreach ($item in -split $v) {
-                $item = $item -replace "#", "[\d]"
-                $item = $item -replace "\*", "[\S]*"
-                if ($computerName -match $item) {return $true;}
-            }
+    #written by: Øyvind Nilsen (oyvindnilsen.com)
+    [bool]$ret = $false #return variable
+    $domainRoot = [ADSI]''
+    $dirSearcher = New-Object System.DirectoryServices.DirectorySearcher($domainRoot)
+    $dirSearcher.filter = "(&(objectClass=user)(sAMAccountName=$name))"
+    $results = $dirSearcher.findall()
+    if ($results.Count -gt 0) #if a user object is found, that means the user exists.
+    {
+        $ret = $true
+    }
+    return $ret
+}
+
+#EndRegion
+
+#Region Shortcuts
+# ====================================================================================
+# Func: AddResourcesLink
+# Desc: Adds an item to the Resources list shown on the Central Admin homepage
+#       $url should be relative to the central admin home page and should not include the leading /
+# ====================================================================================
+Function AddResourcesLink([string]$title,[string]$url)
+{
+    $centraladminapp = Get-SPWebApplication -IncludeCentralAdministration | ? {$_.IsAdministrationWebApplication -eq $true}
+    $centraladminurl = $centraladminapp.Url
+    $centraladmin = (Get-SPSite $centraladminurl)
+
+    $item = $centraladmin.RootWeb.Lists["Resources"].Items | Where { $_["URL"] -match ".*, $title" }
+    If ($item -eq $null )
+    {
+        $item = $centraladmin.RootWeb.Lists["Resources"].Items.Add();
+    }
+
+    $url = $centraladminurl + $url + ", $title";
+    $item["URL"] = $url;
+    $item.Update();
+}
+
+# ====================================================================================
+# Func: PinToTaskbar
+# Desc: Pins a program to the taskbar
+# From: http://techibee.com/powershell/pin-applications-to-task-bar-using-powershell/685
+# ====================================================================================
+Function PinToTaskbar([string]$application)
+{
+    $shell = New-Object -ComObject "Shell.Application"
+    $folder = $shell.Namespace([System.IO.Path]::GetDirectoryName($application))
+
+    Foreach ($verb in $folder.ParseName([System.IO.Path]::GetFileName($application)).verbs())
+    {
+        If($verb.name.replace("&","") -match "Pin to Taskbar")
+        {
+            $verb.DoIt()
         }
     }
 }
-
+#EndRegion
 #EndRegion
