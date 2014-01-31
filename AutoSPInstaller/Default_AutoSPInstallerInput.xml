@@ -445,7 +445,7 @@
             </Database>
         </StateService>
         <!--If you want to provision the WebAnalyticsService then you should also ensure that StateService Provision="true" as well-->
-        <WebAnalyticsService Provision="true"
+        <WebAnalyticsService Provision="false"
                              Name="Web Analytics Services">
             <!-- You can specify a different DB server/instance or alias per web application and service application. The behavior is slightly different than with the farm DB server though, see below. -->
             <Database>
