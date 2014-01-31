@@ -202,27 +202,27 @@ if($Edition -eq "Foundation")
                     
                         $CurrBCSServers = $AutoSPXML.Configuration.ServiceApps.BusinessDataConnectivity.Provision
                         if($CurrBCSServers -eq "false"){$NewBCSServers = $serverName}
-                        else{$NewBCSServers = $CurrBCSServers + " " + $serverName}
+                        else{$NewBCSServers = $CurrBCSServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.BusinessDataConnectivity.SetAttribute("Provision", $NewBCSServers)
 
                         $CurrAppMgmtServers = $AutoSPXML.Configuration.ServiceApps.AppManagementService.Provision
                         if($CurrAppMgmtServers -eq "false"){$NewAppMgmtServers = $serverName}
-                        else{$NewAppMgmtServers = $CurrAppMgmtServers + " " + $serverName}
+                        else{$NewAppMgmtServers = $CurrAppMgmtServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.AppManagementService.SetAttribute("Provision", $NewAppMgmtServers)
 
                         $CurrSubscServers = $AutoSPXML.Configuration.ServiceApps.SubscriptionSettingsService.Provision
                         if($CurrSubscServers -eq "false"){$NewSubscServers = $serverName}
-                        else{$NewSubscServers = $CurrSubscServers + " " + $serverName}
+                        else{$NewSubscServers = $CurrSubscServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.SubscriptionSettingsService.SetAttribute("Provision", $NewSubscServers)
 
                         $CurrUsageServers = $AutoSPXML.Configuration.ServiceApps.SPUsageService.Provision
                         if($CurrUsageServers -eq "false"){$NewUsageServers = $serverName}
-                        else{$NewUsageServers = $CurrUsageServers + " " + $serverName}
+                        else{$NewUsageServers = $CurrUsageServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.SPUsageService.SetAttribute("Provision", $NewUsageServers)
 
                         $CurrStateServers = $AutoSPXML.Configuration.ServiceApps.StateService.Provision
                         if($CurrStateServers -eq "false"){$NewStateServers = $serverName}
-                        else{$NewStateServers = $CurrStateServers + " " + $serverName}
+                        else{$NewStateServers = $CurrStateServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.StateService.SetAttribute("Provision", $NewStateServers)
 
                         
@@ -303,85 +303,85 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
                     
                         $CurrBCSServers = $AutoSPXML.Configuration.ServiceApps.BusinessDataConnectivity.Provision
                         if($CurrBCSServers -eq "false"){$NewBCSServers = $serverName}
-                        else{$NewBCSServers = $CurrBCSServers + " " + $serverName}
+                        else{$NewBCSServers = $CurrBCSServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.BusinessDataConnectivity.SetAttribute("Provision", $NewBCSServers)
 
                         $CurrMMDataServers = $AutoSPXML.Configuration.ServiceApps.ManagedMetadataServiceApp.Provision
                         if($CurrMMDataServers -eq "false"){$NewMMDataServers = $serverName}
-                        else{$NewMMDataServers = $CurrMMDataServers + " " + $serverName}
+                        else{$NewMMDataServers = $CurrMMDataServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.ManagedMetadataServiceApp.SetAttribute("Provision", $NewMMDataServers)
                     
                         $CurrWordServers = $AutoSPXML.Configuration.ServiceApps.WordAutomationService.Provision
                         if($CurrWordServers -eq "false"){$NewWordServers = $serverName}
-                        else{$NewWordServers = $CurrWordServers + " " + $serverName}
+                        else{$NewWordServers = $CurrWordServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.WordAutomationService.SetAttribute("Provision", $NewWordServers)
                     
                         $CurrAppMgmtServers = $AutoSPXML.Configuration.ServiceApps.AppManagementService.Provision
                         if($CurrAppMgmtServers -eq "false"){$NewAppMgmtServers = $serverName}
-                        else{$NewAppMgmtServers = $CurrAppMgmtServers + " " + $serverName}
+                        else{$NewAppMgmtServers = $CurrAppMgmtServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.AppManagementService.SetAttribute("Provision", $NewAppMgmtServers)
 
                         $CurrSubscServers = $AutoSPXML.Configuration.ServiceApps.SubscriptionSettingsService.Provision
                         if($CurrSubscServers -eq "false"){$NewSubscServers = $serverName}
-                        else{$NewSubscServers = $CurrSubscServers + " " + $serverName}
+                        else{$NewSubscServers = $CurrSubscServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.SubscriptionSettingsService.SetAttribute("Provision", $NewSubscServers)
 
                         $CurrWorkMgmtServers = $AutoSPXML.Configuration.ServiceApps.WorkManagementService.Provision
                         if($CurrWorkMgmtServers -eq "false"){$NewWorkMgmtServers = $serverName}
-                        else{$NewWorkMgmtServers = $CurrWorkMgmtServers + " " + $serverName}
+                        else{$NewWorkMgmtServers = $CurrWorkMgmtServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.WorkManagementService.SetAttribute("Provision", $NewWorkMgmtServers)
 
                         $CurrMTransServers = $AutoSPXML.Configuration.ServiceApps.MachineTranslationService.Provision
                         if($CurrMTransServers -eq "false"){$NewMTransServers = $serverName}
-                        else{$NewMTransServers = $CurrMTransServers + " " + $serverName}
+                        else{$NewMTransServers = $CurrMTransServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.MachineTranslationService.SetAttribute("Provision", $NewMTransServers)
 
                         $CurrPPTServers = $AutoSPXML.Configuration.ServiceApps.PowerPointConversionService.Provision
                         if($CurrPPTServers -eq "false"){$NewPPTServers = $serverName}
-                        else{$NewPPTServers = $CurrPPTServers + " " + $serverName}
+                        else{$NewPPTServers = $CurrPPTServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.PowerPointConversionService.SetAttribute("Provision", $NewPPTServers)
 
                         $CurrSStoreServers = $AutoSPXML.Configuration.ServiceApps.SecureStoreService.Provision
                         if($CurrSStoreServers -eq "false"){$NewSStoreServers = $serverName}
-                        else{$NewSStoreServers = $CurrSStoreServers + " " + $serverName}
+                        else{$NewSStoreServers = $CurrSStoreServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.SecureStoreService.SetAttribute("Provision", $NewSStoreServers)
 
                         $CurrUsageServers = $AutoSPXML.Configuration.ServiceApps.SPUsageService.Provision
                         if($CurrUsageServers -eq "false"){$NewUsageServers = $serverName}
-                        else{$NewUsageServers = $CurrUsageServers + " " + $serverName}
+                        else{$NewUsageServers = $CurrUsageServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.SPUsageService.SetAttribute("Provision", $NewUsageServers)
 
                         $CurrWebAnalyticsServers = $AutoSPXML.Configuration.ServiceApps.WebAnalyticsService.Provision
                         if($CurrWebAnalyticsServers -eq "false"){$NewWebAnalyticsServers = $serverName}
-                        else{$NewWebAnalyticsServers = $CurrWebAnalyticsServers + " " + $serverName}
+                        else{$NewWebAnalyticsServers = $CurrWebAnalyticsServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.WebAnalyticsService.SetAttribute("Provision", $NewWebAnalyticsServers)
 
                         $CurrStateServers = $AutoSPXML.Configuration.ServiceApps.StateService.Provision
                         if($CurrStateServers -eq "false"){$NewStateServers = $serverName}
-                        else{$NewStateServers = $CurrStateServers + " " + $serverName}
+                        else{$NewStateServers = $CurrStateServers + ", " + $serverName}
                         $AutoSPXML.Configuration.ServiceApps.StateService.SetAttribute("Provision", $NewStateServers)
                         
                         if($Edition -eq "Enterprise")
                         {
                             $CurrExcelServers = $AutoSPXML.Configuration.EnterpriseServiceApps.ExcelServices.Provision
                             if($CurrExcelServers -eq "false"){$NewExcelServers = $serverName}
-                            else{$NewExcelServers = $CurrExcelServers + " " + $serverName}
+                            else{$NewExcelServers = $CurrExcelServers + ", " + $serverName}
                             $AutoSPXML.Configuration.EnterpriseServiceApps.ExcelServices.SetAttribute("Provision", $NewExcelServers)
 
                             $CurrVisioServers = $AutoSPXML.Configuration.EnterpriseServiceApps.VisioService.Provision
                             if($CurrVisioServers -eq "false"){$NewVisioServers = $serverName}
-                            else{$NewVisioServers = $CurrVisioServers + " " + $serverName}
+                            else{$NewVisioServers = $CurrVisioServers + ", " + $serverName}
                             $AutoSPXML.Configuration.EnterpriseServiceApps.VisioService.SetAttribute("Provision", $NewVisioServers)
 
                             $AccessNode = $AutoSPXML.Configuration.EnterpriseServiceApps.AccessService | ?{$_.Name -eq "Access 2010 Services"}
                             $CurrAccessServers = $AccessNode.Provision
                             if($CurrAccessServers -eq "false"){$NewAccessServers = $serverName}
-                            else{$NewAccessServers = $CurrAccessServers + " " + $serverName}
+                            else{$NewAccessServers = $CurrAccessServers + ", " + $serverName}
                             $AccessNode.SetAttribute("Provision", $NewAccessServers)
 
                             $CurrPerformancePointServers = $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.Provision
                             if($CurrPerformancePointServers -eq "false"){$NewPerformancePointServers = $serverName}
-                            else{$NewPerformancePointServers = $CurrPerformancePointServers + " " + $serverName}
+                            else{$NewPerformancePointServers = $CurrPerformancePointServers + ", " + $serverName}
                             $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.SetAttribute("Provision", $NewPerformancePointServers)
                         }
 
