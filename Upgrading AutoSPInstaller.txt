@@ -1,10 +1,10 @@
-!!DO NOT overwrite \AutoSPInstaller\AutoSPInstallerFunctionsCustom.ps1!! - This contains some custom functions for Rackspace specific script requirements
+1) !!DO NOT overwrite \AutoSPInstaller\AutoSPInstallerFunctionsCustom.ps1!! - This contains some custom functions for Rackspace specific script requirements
 
 Overwrite everything else
 
-Delete the AutoSPInstallerInput.XML file. This gets built from the Rackspace wrapper scripts based off of the Default_AutoSPinstallerInput.XML file
+2) Delete the AutoSPInstallerInput.XML file. This gets built from the Rackspace wrapper scripts based off of the Default_AutoSPinstallerInput.XML file
 
-Edit AutoSPInstallerMain.ps1 and add the following to around line 86
+3) Edit AutoSPInstallerMain.ps1 and add the following to around line 86
 # Configure Rackspace Specific Pre-Requisites
 Set-RSPreReqs
 
@@ -23,4 +23,4 @@ Function Install-Remote
 {
 
 
-For AutoSPInstallerGUI - Overwrite both AutoSPinstallerGUI.exe and Prerequisite Check.exe (only two files in the downloaded zip)
+4) For AutoSPInstallerGUI - Overwrite both AutoSPinstallerGUI.exe and Prerequisite Check.exe (only two files in the downloaded zip)
