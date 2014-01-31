@@ -52,10 +52,14 @@ $spYear = $spYears.$env:spVer
 $PSConfig = "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\$env:spVer\BIN\psconfig.exe"
 $PSConfigUI = "$env:CommonProgramFiles\Microsoft Shared\Web Server Extensions\$env:spVer\BIN\psconfigui.exe"
 
+#Region External Functions
+. "$env:dp0\AutoSPInstallerFunctions.ps1"
+. "$env:dp0\AutoSPInstallerFunctionsCustom.ps1"
+#EndRegion
+
 $script:DBPrefix = $xmlinput.Configuration.Farm.Database.DBPrefix
 If (($dbPrefix -ne "") -and ($dbPrefix -ne $null)) {$script:DBPrefix += "_"}
 If ($dbPrefix -like "*localhost*") {$script:DBPrefix = $dbPrefix -replace "localhost","$env:COMPUTERNAME"}
-
 
 if ($xmlinput.Configuration.Install.RemoteInstall.Enable -eq $true)
 {
@@ -77,14 +81,6 @@ else
 Write-Host -ForegroundColor White " - Setting power management plan to `"High Performance`"..."
 Start-Process -FilePath "$env:SystemRoot\system32\powercfg.exe" -ArgumentList "/s 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c" -NoNewWindow
 #EndRegion
-
-#Region External Functions
-. "$env:dp0\AutoSPInstallerFunctions.ps1"
-. "$env:dp0\AutoSPInstallerFunctionsCustom.ps1"
-#EndRegion
-
-# Configure Rackspace Specific Pre-Requisites
-Set-RSPreReqs
 
 #Region Remote Install
 Function Install-Remote
@@ -148,7 +144,9 @@ Function Install-Remote
 #Region Prepare For Install
 Function PrepForInstall
 {
+    CheckXMLVersion $xmlinput
     CheckInput
+    Write-Host -ForegroundColor White " - Install based on: `n  - $inputFile `n  - Environment: $($xmlinput.Configuration.getAttribute(`"Environment`")) `n  - Version: $($xmlinput.Configuration.getAttribute(`"Version`"))"
     $spInstalled = (Get-SharePointInstall)
     ValidateCredentials $xmlinput
     ValidatePassphrase $xmlinput
@@ -160,7 +158,6 @@ Function PrepForInstall
 #Region Install SharePoint binaries
 Function Run-Install
 {
-    Write-Host -ForegroundColor White " - Install based on: `n  - $inputFile `n  - Environment: $($xmlinput.Configuration.getAttribute(`"Environment`")) `n  - Version: $($xmlinput.Configuration.getAttribute(`"Version`"))"
     DisableLoopbackCheck $xmlinput
     RemoveIEEnhancedSecurity $xmlinput
     AddSourcePathToLocalIntranetZone
@@ -170,6 +167,7 @@ Function Run-Install
     ConfigureIISLogging $xmlinput
     InstallSharePoint $xmlinput
     InstallOfficeWebApps2010 $xmlinput
+    InstallProjectServer $xmlinput
     InstallLanguagePacks $xmlinput
     InstallUpdates
     FixTaxonomyPickerBug
@@ -215,6 +213,7 @@ Function Setup-Services
     CreateVisioServiceApp $xmlinput
     CreatePerformancePointServiceApp $xmlinput
     CreateWordAutomationServiceApp $xmlinput
+    CreateProjectServerServiceApp $xmlinput
     ConfigureWorkflowTimerService $xmlinput
     if ($env:spVer -eq "14") # These are for SP2010 / Office Web Apps 2010 only
     {
