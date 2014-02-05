@@ -71,13 +71,38 @@ $loDomainUser = $netbios + "\" + $loggedOnUser
 "<b>Domain Admin Account:</b> $loDomainUser" | out-file "$text" -Append
 
 # Get the Farm Prefix
-$FarmPrefix = Read-Host "Enter a Prefix to be used in the Farm (MAX 5 chars - ex. Dev or Prod or Leave Blank for No Prefix) "   
-$AutoSPXML.Configuration.Farm.Database.DBPrefix = [string]$FarmPrefix
+$FarmPrefix = Read-Host "Enter a Prefix to be used for Service Accounts in the Farm (MAX 7 chars - ex. Prod or 1028375 or Leave Blank for No Prefix) "   
+$AutoSPXML.Configuration.SAPrefix = "$FarmPrefix"
+
+#Choose the Database Prefix
+Write-Host -ForegroundColor Yellow "Choose your Database Prefix (Default == 1.) "
+Write-Host -ForegroundColor Cyan "1. $FarmPrefix"
+Write-Host -ForegroundColor Cyan "2. No Prefix"
+Write-Host -ForegroundColor Cyan "3. Enter a new Prefix"
+Write-Host -ForegroundColor Cyan " "
+$prefixChoice = Read-Host "Select 1-3: "
+
+switch($prefixChoice)
+{
+
+    1{
+        $AutoSPXML.Configuration.Farm.Database.DBPrefix = [string]$FarmPrefix
+    }
+    2{
+        $AutoSPXML.Configuration.Farm.Database.DBPrefix = ""
+    }
+    3{
+        $pfx = Read-Host "Enter a Prefix to use for the Databases in the Farm "
+        $AutoSPXML.Configuration.Farm.Database.DBPrefix = "$pfx"
+    }    
+    default{$AutoSPXML.Configuration.Farm.Database.DBPrefix = [string]$FarmPrefix}
+}
 
 "<b>SharePoint Farm:</b> $FarmPrefix" | out-file "$text" -Append
 
 # Set the Environment attribute
 $AutoSPXML.Configuration.Environment = $custNum + "_" + $FarmPrefix
+
 
 #Choose the edition of SharePoint you are installing
 Write-Host -ForegroundColor Yellow "Choose your Version (Default == SharePoint 2010)"
@@ -153,6 +178,59 @@ if($Version -eq "2013")
 
 "" | out-file "$text" -Append
 
+$portalName = Read-Host "Enter the Name for the first Portal Site (Leave blank for 'Portal') "
+$portalUrl = Read-Host "Enter the URL for the first Portal Site (Leave blank for 'http://portal.racktest.local') "
+
+$portalTemplate = Read-Host "Enter the Name of the SP Web Template for the $portalName Site (Leave blank for STS#0) "
+
+$mySiteName = Read-Host "Enter the Name for the MySite Host Site (Leave blank for 'MySite Host') "
+$mySiteUrl = Read-Host "Enter the URL for the MySite Host Site (Leave blank for 'http://mysite.racktest.local') "
+
+$portalAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "Portal"}
+$mySiteAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "MySiteHost"}
+
+if([string]::IsNullOrEmpty($portalName))
+{
+    $portalAppNode.Name = "Portal"
+    $portalAppNode.ApplicationPool = "Portal App Pool"
+}
+else
+{
+    $portalAppNode.Name = "$portalName"
+    $portalAppNode.ApplicationPool = "$portalName" + " App Pool"
+}
+
+if([string]::IsNullOrEmpty($portalTemplate))
+{
+    $portalAppNode.SiteCollections.SiteCollection.Template = "STS#0"
+}
+else{$portalAppNode.SiteCollections.SiteCollection.Template = "$portalTemplate"}
+
+
+if([string]::IsNullOrEmpty($portalUrl))
+{
+    $portalAppNode.Url = "http://portal.racktest.local"
+}
+else{$portalAppNode.Url = "$portalUrl"}
+
+if([string]::IsNullOrEmpty($mySiteName))
+{
+    $mySiteAppNode.Name = "MySite Host"
+    $mySiteAppNode.ApplicationPool = "MySite App Pool"
+}
+else
+{
+    $mySiteAppNode.Name = "$mySiteName"
+    $mySiteAppNode.ApplicationPool = "$mySiteName" + " App Pool"
+}
+
+if([string]::IsNullOrEmpty($mySiteUrl))
+{
+    $mSiteAppNode.Url = "http://mysite.racktest.local"
+}
+else{$mySiteAppNode.Url = "$mySiteUrl"}
+
+
 # Populate Server/Service Architecture
 $numServers = Read-Host "How many servers are in this Farm? "
 
@@ -160,10 +238,7 @@ $wfe = ""
 $apps = ""
 
 if($Edition -eq "Foundation")
-{
-    $portalAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "Portal"}
-    $portalAppNode.SiteCollections.SiteCollection.Template = "STS#0"
-    
+{   
     for($i=1; $i -le $numServers; $i++)
     {
         $serverName = Read-Host "What is the name of Server $i ? "   
@@ -273,29 +348,19 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
             Write-Host -ForegroundColor Yellow "Choose a Role for server $serverName "
             Write-Host -ForegroundColor Cyan "1. Web Front-End" 
             Write-Host -ForegroundColor Cyan "2. Application"
-            Write-Host -ForegroundColor Cyan "3. Index"
+            Write-Host -ForegroundColor Cyan "3. Search Components"
             Write-Host -ForegroundColor Cyan "4. Database"
             Write-Host -ForegroundColor Cyan "5. Central Administration (Only Choose this Role for one server)"
-            Write-Host -ForegroundColor Cyan "6. Search Administration (Only Choose this Role for one server)"
-            Write-Host -ForegroundColor Cyan "7. User Profile Sync (Only Choose this Role for one server)"
-            Write-Host -ForegroundColor Cyan "8. Done adding Roles"
+            Write-Host -ForegroundColor Cyan "6. User Profile Sync (Only Choose this Role for one server)"
+            Write-Host -ForegroundColor Cyan "7. Done adding Roles"
             Write-Host -ForegroundColor Cyan " "
-            $Choice = Read-Host "Select 1-8: "
+            $Choice = Read-Host "Select 1-7: "
         
             switch($Choice)
             {
                 1 { 
                         if($wfe -eq ""){$wfe = $serverName}
                         else{$wfe = $wfe + ", " + $serverName}
-
-                        $entSearch = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication
-                        $newQueryServerNode = $AutoSPXML.CreateElement("Server")
-                        $newQueryServerNode.SetAttribute("Name",$serverName)
-                        $entSearch["QueryComponent"].AppendChild($newQueryServerNode) | Out-Null
-
-                        $newSQSSServerNode = $AutoSPXML.CreateElement("Server")
-                        $newSQSSServerNode.SetAttribute("Name",$serverName)
-                        $entSearch["SearchQueryAndSiteSettingsServers"].AppendChild($newSQSSServerNode) | Out-Null
                   }
                 2 {
                         if($apps -eq ""){$apps = $serverName}
@@ -387,25 +452,64 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
 
                   }
                 3 {
-                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Provision = "true"
-
+                        
                         $entSearch = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication
-                        $newCrawlServerNode = $AutoSPXML.CreateElement("Server")
-                        $newCrawlServerNode.SetAttribute("Name",$serverName)
-                        $entSearch["CrawlComponent"].AppendChild($newCrawlServerNode) | Out-Null
+                        $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Provision = "true"
+                        $searchRoleChoice = ""
+                        Do
+                        {
+                            #Choose the Search Roles for each server
+                            Write-Host -ForegroundColor Yellow "Choose a Search Role for server $serverName "
+                            Write-Host -ForegroundColor Cyan "1. Search Administration" 
+                            Write-Host -ForegroundColor Cyan "2. Index Component"
+                            Write-Host -ForegroundColor Cyan "3. Crawl Component"
+                            Write-Host -ForegroundColor Cyan "4. Query Component"
+                            Write-Host -ForegroundColor Cyan "5. Content Processing Component"
+                            Write-Host -ForegroundColor Cyan "6. Analytics Processing Component"
+                            Write-Host -ForegroundColor Cyan "7. Done adding Search Roles"
+                            Write-Host -ForegroundColor Cyan " "
+                            $searchRoleChoice = Read-Host "Select 1-7: "
+        
+                            switch($searchRoleChoice)
+                            {
+                                1 {
+                                    $entSearch = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication
+                                    $newAdminServerNode = $AutoSPXML.CreateElement("Server")
+                                    $newAdminServerNode.SetAttribute("Name",$serverName)
+                                    $entSearch["AdminComponent"].AppendChild($newAdminServerNode) | Out-Null    
+                                }
+                                2 {
+                                    $newIndexServerNode = $AutoSPXML.CreateElement("Server")
+                                    $newIndexServerNode.SetAttribute("Name",$serverName)
+                                    $entSearch["IndexComponent"].AppendChild($newIndexServerNode) | Out-Null
+                                }
+                                3 {
+                                    $newCrawlServerNode = $AutoSPXML.CreateElement("Server")
+                                    $newCrawlServerNode.SetAttribute("Name",$serverName)
+                                    $entSearch["CrawlComponent"].AppendChild($newCrawlServerNode) | Out-Null
+                                }
+                                4 {
+                                    
+                                    $newQueryServerNode = $AutoSPXML.CreateElement("Server")
+                                    $newQueryServerNode.SetAttribute("Name",$serverName)
+                                    $entSearch["QueryComponent"].AppendChild($newQueryServerNode) | Out-Null
 
-                        $newIndexServerNode = $AutoSPXML.CreateElement("Server")
-                        $newIndexServerNode.SetAttribute("Name",$serverName)
-                        $entSearch["IndexComponent"].AppendChild($newIndexServerNode) | Out-Null
-
-                        $newcontentServerNode = $AutoSPXML.CreateElement("Server")
-                        $newcontentServerNode.SetAttribute("Name",$serverName)
-                        $entSearch["ContentProcessingComponent"].AppendChild($newcontentServerNode) | Out-Null
-                        
-                        $newAnalyticsServerNode = $AutoSPXML.CreateElement("Server")
-                        $newAnalyticsServerNode.SetAttribute("Name",$serverName)
-                        $entSearch["AnalyticsProcessingComponent"].AppendChild($newAnalyticsServerNode) | Out-Null
-                        
+                                    $newSQSSServerNode = $AutoSPXML.CreateElement("Server")
+                                    $newSQSSServerNode.SetAttribute("Name",$serverName)
+                                    $entSearch["SearchQueryAndSiteSettingsServers"].AppendChild($newSQSSServerNode) | Out-Null
+                                }
+                                5 {
+                                    $newcontentServerNode = $AutoSPXML.CreateElement("Server")
+                                    $newcontentServerNode.SetAttribute("Name",$serverName)
+                                    $entSearch["ContentProcessingComponent"].AppendChild($newcontentServerNode) | Out-Null
+                                }
+                                6 {
+                                    $newAnalyticsServerNode = $AutoSPXML.CreateElement("Server")
+                                    $newAnalyticsServerNode.SetAttribute("Name",$serverName)
+                                    $entSearch["AnalyticsProcessingComponent"].AppendChild($newAnalyticsServerNode) | Out-Null
+                                }
+                            }
+                        }while($searchRoleChoice -ne "7")      
                 }
 
                 4 {
@@ -433,19 +537,13 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
                         $AutoSPXML.Configuration.Farm.CentralAdmin.SetAttribute("Provision", $serverName)
                   } 
                 6 {
-                        $entSearch = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication
-                        $newAdminServerNode = $AutoSPXML.CreateElement("Server")
-                        $newAdminServerNode.SetAttribute("Name",$serverName)
-                        $entSearch["AdminComponent"].AppendChild($newAdminServerNode) | Out-Null
-                  } 
-                7 {
                         $AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SetAttribute("Provision", $serverName)
                   }        
             }
         
         
         }
-        while($Choice -ne "8")
+        while($Choice -ne "7")
     }
 }
 

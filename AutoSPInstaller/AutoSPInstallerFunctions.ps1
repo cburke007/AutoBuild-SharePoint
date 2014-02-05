@@ -1,4 +1,4 @@
-ï»¿# ===================================================================================
+# ===================================================================================
 # EXTERNAL FUNCTIONS
 # ===================================================================================
 
@@ -633,7 +633,7 @@ Function InstallPrerequisites([xml]$xmlinput)
                                 if (!(Get-WindowsFeature -Name NET-Framework-Core).Installed)
                                 {
                                     Start-Process -FilePath DISM.exe -ArgumentList "/Online /Enable-Feature /FeatureName:NetFx3 /All /LimitAccess /Source:`"$env:SPbits\PrerequisiteInstallerFiles\sxs`"" -NoNewWindow -Wait
-                                    ##Install-WindowsFeature NET-Framework-Core â€“Source "$env:SPbits\PrerequisiteInstallerFiles\sxs" | Out-Null
+                                    ##Install-WindowsFeature NET-Framework-Core –Source "$env:SPbits\PrerequisiteInstallerFiles\sxs" | Out-Null
                                     Write-Host -ForegroundColor White "Done."
                                 }
                                 else {Write-Host -ForegroundColor White "Already installed."}
@@ -3952,7 +3952,7 @@ Function ConfigureDistributedCacheService ([xml]$xmlinput)
 #Region Provision Enterprise Search
 # Original script for SharePoint 2010 beta2 by Gary Lapointe ()
 #
-# Modified by SÃ¸ren Laurits Nielsen (soerennielsen.wordpress.com):
+# Modified by Søren Laurits Nielsen (soerennielsen.wordpress.com):
 #
 # Modified to fix some errors since some cmdlets have changed a bit since beta 2 and added support for "ShareName" for
 # the query component. It is required for non DC computers.
@@ -4407,7 +4407,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                     if (!($adminComponents | Where-Object {MatchComputerName $_.ServerName $env:COMPUTERNAME}))
                     {
                         Write-Host -ForegroundColor White "Creating..." -NoNewline
-                        New-SPEnterpriseSearchAdminComponent â€“SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
+                        New-SPEnterpriseSearchAdminComponent –SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
                         If ($?)
                         {
                             Write-Host -ForegroundColor White "Done."
@@ -4427,7 +4427,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                     if (!($contentProcessingComponents | Where-Object {MatchComputerName $_.ServerName $env:COMPUTERNAME}))
                     {
                         Write-Host -ForegroundColor White "Creating..." -NoNewline
-                        New-SPEnterpriseSearchContentProcessingComponent â€“SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
+                        New-SPEnterpriseSearchContentProcessingComponent –SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
                         If ($?)
                         {
                             Write-Host -ForegroundColor White "Done."
@@ -4447,7 +4447,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                     if (!($analyticsProcessingComponents | Where-Object {MatchComputerName $_.ServerName $env:COMPUTERNAME}))
                     {
                         Write-Host -ForegroundColor White "Creating..." -NoNewline
-                        New-SPEnterpriseSearchAnalyticsProcessingComponent â€“SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
+                        New-SPEnterpriseSearchAnalyticsProcessingComponent –SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
                         If ($?)
                         {
                             Write-Host -ForegroundColor White "Done."
@@ -4467,7 +4467,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                     if (!($crawlComponents | Where-Object {MatchComputerName $_.ServerName $env:COMPUTERNAME}))
                     {
                         Write-Host -ForegroundColor White "Creating..." -NoNewline
-                        New-SPEnterpriseSearchCrawlComponent â€“SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
+                        New-SPEnterpriseSearchCrawlComponent –SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
                         If ($?)
                         {
                             Write-Host -ForegroundColor White "Done."
@@ -4491,7 +4491,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                         if ($indexLocation -ne "$dataDir\Office Server\Applications")
                         {$rootDirectorySwitch = @{RootDirectory = $indexLocation}}
                         else {$rootDirectorySwitch = @{}}
-                        New-SPEnterpriseSearchIndexComponent â€“SearchTopology $clone -SearchServiceInstance $searchSvc @rootDirectorySwitch | Out-Null
+                        New-SPEnterpriseSearchIndexComponent –SearchTopology $clone -SearchServiceInstance $searchSvc @rootDirectorySwitch | Out-Null
                         If ($?)
                         {
                             Write-Host -ForegroundColor White "Done."
@@ -4511,7 +4511,7 @@ function CreateEnterpriseSearchServiceApp([xml]$xmlinput)
                     if (!($queryComponents | Where-Object {MatchComputerName $_.ServerName $env:COMPUTERNAME}))
                     {
                         Write-Host -ForegroundColor White "Creating..." -NoNewline
-                        New-SPEnterpriseSearchQueryProcessingComponent â€“SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
+                        New-SPEnterpriseSearchQueryProcessingComponent –SearchTopology $clone -SearchServiceInstance $searchSvc | Out-Null
                         If ($?)
                         {
                             Write-Host -ForegroundColor White "Done."
@@ -6886,7 +6886,7 @@ Function Set-UserAccountControl ($flag)
 # ====================================================================================
 function userExists ([string]$name)
 {
-    #written by: Ã˜yvind Nilsen (oyvindnilsen.com)
+    #written by: Øyvind Nilsen (oyvindnilsen.com)
     [bool]$ret = $false #return variable
     $domainRoot = [ADSI]''
     $dirSearcher = New-Object System.DirectoryServices.DirectorySearcher($domainRoot)

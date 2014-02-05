@@ -4,7 +4,7 @@
 
 function New-ADUser
 {
-	param([string]$AccountName, [string]$Password, [string]$type)
+	param([string]$AccountName, [string]$type, [string]$Password)
     
     #Region Create AD Service Accounts
     #Get AD Information
@@ -190,15 +190,6 @@ Function Set-SQLAccess
 }
 #EndRegion
 
-function CreateServAcct
-{
-    param([string]$uname, [string]$type, [string]$pass)
-    
-    New-ADUser $uname $pass $type   
-    $UserLogEntry = $type + " = " + $netbios + "\" + $uname + " " + $pass    
-    $UserLogEntry | out-file "$text" -append
-}
-
 function UserExists
 {
     param([string]$uname)
@@ -236,18 +227,30 @@ if([string]::IsNullOrEmpty($AutoSPXML.Configuration.Farm.Database.DBAlias.DBPort
 }
 else{$dbServer = [string]$AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance + "," + [string]$AutoSPXML.Configuration.Farm.Database.DBAlias.DBPort}
 
-$prefix = $AutoSPXML.Configuration.Farm.Database.DBPrefix
+$prefix = $AutoSPXML.Configuration.SAPrefix
 if($prefix -eq $null -or $prefix -eq "")
 {
     $AcctPrefix = ""
 }
-else{$AcctPrefix = $prefix + "_"}
+else{$AcctPrefix = $prefix + "-"}
 
 # Set Farm Service Account Names
-$FarmAdmin = $AcctPrefix + "SP_Admin"
-if(UserExists $FarmAdmin){$pass = Read-Host "User $FarmAdmin Exists! Please enter existing Password ";CreateServAcct $FarmAdmin "Farm Admin" $pass}
-else{$pass = Get-ComplexPassword; CreateServAcct $FarmAdmin "Farm Admin" $pass}
+Write-Host -ForegroundColor Yellow "Creating Service Accounts..."
+
+$customSA = Read-Host "Do you wish to use custom service accounts (Y/N - Default = N)? "
+
+if($customSA -eq "Y" -or $customSA -eq "y")
+{
+    $input = Read-Host "Please enter the Farm Admin Account "
+    $FarmAdmin = $AcctPrefix + $input
+}
+else{$FarmAdmin = $AcctPrefix + "SP_Admin"}
+if(UserExists $FarmAdmin){$pass = Read-Host "User $FarmAdmin Exists! Please enter existing Password "}
+else{$pass = Get-ComplexPassword; New-ADUser $FarmAdmin "Farm Admin" $pass}
 $FarmAdminPass = $pass
+   
+$UserLogEntry = "Farm Admin" + " = " + $netbios + "\" + $FarmAdmin + " " + $pass    
+$UserLogEntry | out-file "$text" -append
 
 $AutoSPXML.Configuration.Install.AutoAdminLogon.Enable = "true"
 $AutoSPXML.Configuration.Install.AutoAdminLogon.Password = "$pass"
@@ -262,9 +265,17 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Foundation")
 # Add SQL Permissions for Farm Admin
 Set-SQLAccess "$netBios\$FarmAdmin" "SysAdmin" $dbServer
             
-$FarmAcct = $AcctPrefix + "SP_Connect"
-if(UserExists $FarmAcct){$pass = Read-Host "User $FarmAcct Exists! Please enter existing Password ";CreateServAcct $FarmAcct "Farm Connect" $pass}
-else{$pass = Get-ComplexPassword; CreateServAcct $FarmAcct "Farm Connect" $pass}
+if($customSA -eq "Y" -or $customSA -eq "y")
+{
+    $input = Read-Host "Please enter the Farm Connect Account "
+    $FarmAcct = $AcctPrefix + $input
+}
+else{$FarmAcct = $AcctPrefix + "SP_Connect"}
+if(UserExists $FarmAcct){$pass = Read-Host "User $FarmAcct Exists! Please enter existing Password "}
+else{$pass = Get-ComplexPassword; New-ADUser $FarmAcct "Farm Connect" $pass}
+   
+$UserLogEntry = "Farm Account" + " = " + $netbios + "\" + $FarmAcct + " " + $pass    
+$UserLogEntry | out-file "$text" -append
 
 if($AutoSPXML.Configuration.Install.SKU -eq "Foundation")
 {
@@ -283,28 +294,51 @@ $AutoSPXML.Configuration.Farm.Account.Password = "$pass"
 Set-SQLAccess "$netBios\$FarmAcct" "SecurityAdmin" $dbServer
 Set-SQLAccess "$netBios\$FarmAcct" "DBCreator" $dbServer
             
-$ServiceAppAP = $AcctPrefix + "SP_ServApp_AP"
-if(UserExists $ServiceAppAP){$pass = Read-Host "User $ServiceAppAP Exists! Please enter existing Password ";CreateServAcct $ServiceAppAP "Default SA AppPool" $pass}
-else{$pass = Get-ComplexPassword; CreateServAcct $ServiceAppAP "Default SA AppPool" $pass}
+if($customSA -eq "Y" -or $customSA -eq "y")
+{
+    $input = Read-Host "Please enter the Service App Pool Account "
+    $ServiceAppAP = $AcctPrefix + $input
+}
+else{$ServiceAppAP = $AcctPrefix + "SP_SA_AP"}
+if(UserExists $ServiceAppAP){$pass = Read-Host "User $ServiceAppAP Exists! Please enter existing Password "}
+else{$pass = Get-ComplexPassword; New-ADUser $ServiceAppAP "Default SA AppPool" $pass}
+   
+$UserLogEntry = "Default SA AppPool" + " = " + $netbios + "\" + $ServiceAppAP + " " + $pass    
+$UserLogEntry | out-file "$text" -append
 
 $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'spservice']")
 $mgdAcctNode.Username = $netbios + "\" + $ServiceAppAP
 $mgdAcctNode.Password = "$pass" 
 
-$SiteAdmin = $AcctPrefix + "Site_Admin"
-if(UserExists $SiteAdmin){$pass = Read-Host "User $SiteAdmin Exists! Please enter existing Password ";CreateServAcct $SiteAdmin "Default Site Admin" $pass}
-else{$pass = Get-ComplexPassword; CreateServAcct $SiteAdmin "Default Site Admin" $pass}
-            
-$SiteAP = $AcctPrefix + "SP_Site_AP"
-if(UserExists $SiteAP){$pass = Read-Host "User $SiteAP Exists! Please enter existing Password ";CreateServAcct $SiteAP "Default Site AppPool" $pass}
-else{$pass = Get-ComplexPassword; CreateServAcct $SiteAP "Default Site AppPool" $pass}
+if($customSA -eq "Y" -or $customSA -eq "y")
+{
+    $input = Read-Host "Please enter the Site Admin Account "
+    $SiteAdmin = $AcctPrefix + $input
+}
+else{$SiteAdmin = $AcctPrefix + "Site_Admin"}
+if(UserExists $SiteAdmin){$pass = Read-Host "User $SiteAdmin Exists! Please enter existing Password "}
+else{$pass = Get-ComplexPassword; New-ADUser $SiteAdmin "Default Site Admin" $pass}
 
-$mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'portalapppool']")
+$UserLogEntry = "Default Site Admin" + " = " + $netbios + "\" + $SiteAdmin + " " + $pass    
+$UserLogEntry | out-file "$text" -append
+            
+if($customSA -eq "Y" -or $customSA -eq "y")
+{
+    $input = Read-Host "Please enter the Site App Pool Account "
+    $SiteAP = $AcctPrefix + $input
+}
+else{$SiteAP = $AcctPrefix + "SP_Site_AP"}
+if(UserExists $SiteAP){$pass = Read-Host "User $SiteAP Exists! Please enter existing Password "}
+else{$pass = Get-ComplexPassword; New-ADUser $SiteAP "Default Site AppPool" $pass}
+
+$UserLogEntry = "Default Site AppPool" + " = " + $netbios + "\" + $SiteAP + " " + $pass    
+$UserLogEntry | out-file "$text" -append
+ 
+$mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'Portal']")
 $mgdAcctNode.Username = $netbios + "\" + $SiteAP
 $mgdAcctNode.Password = "$pass"
 
 $portalAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "Portal"}
-#$portalAppNode.applicationPoolAccount = $netbios + "\" + $SiteAP
 $portalAppNode.SiteCollections.SiteCollection.Owner = $netbios + "\" + $SiteAdmin
 
 if($AutoSPXML.Configuration.Install.SKU -eq "Foundation")
@@ -312,7 +346,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Foundation")
     $mySiteNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "MySiteHost"}
 	[Void]$mySiteNode.ParentNode.RemoveChild($mySiteNode)
 
-    $mgdAcctNode = $AutoSPXML.Configuration.Farm.ManagedAccounts.ManagedAccount | ?{$_.CommonName -eq "mysiteapppool"}
+    $mgdAcctNode = $AutoSPXML.Configuration.Farm.ManagedAccounts.ManagedAccount | ?{$_.CommonName -eq "MySiteHost"}
 	[Void]$mgdAcctNode.ParentNode.RemoveChild($mgdAcctNode)
 
     $mgdAcctNode = $AutoSPXML.Configuration.Farm.ManagedAccounts.ManagedAccount | ?{$_.CommonName -eq "searchapppool"}
@@ -322,89 +356,135 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Foundation")
     
 if($AutoSPXML.Configuration.Install.SKU -eq "Standard" -or $AutoSPXML.Configuration.Install.SKU -eq "Enterprise")
 {
-    $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'mysiteapppool']")
+    $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'MySiteHost']")
     $mgdAcctNode.Username = $netbios + "\" + $SiteAP
     $mgdAcctNode.Password = "$pass"
          
     $mySiteAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "MySiteHost"}
-    #$mySiteAppNode.applicationPoolAccount = $netbios + "\" + $SiteAP
-   
-    
     $mySiteAppNode.SiteCollections.SiteCollection.Owner = $netbios + "\" + $SiteAdmin
     
-    $SearchAP = $AcctPrefix + "SP_Search_AP"
-    if(UserExists $SearchAP){$pass = Read-Host "User $SearchAP Exists! Please enter existing Password ";CreateServAcct $SearchAP "Search AppPool" $pass}
-    else{$pass = Get-ComplexPassword; CreateServAcct $SearchAP "Search AppPool" $pass}
+    if($customSA -eq "Y" -or $customSA -eq "y")
+    {
+        $input = Read-Host "Please enter the Search Service Account "
+        $SearchServ = $AcctPrefix + $input
+    }
+    else{$SearchServ = $AcctPrefix + "SP_SearchSvc"}
+    if(UserExists $SearchServ){$pass = Read-Host "User $SearchServ Exists! Please enter existing Password "}
+    else{$pass = Get-ComplexPassword; New-ADUser $SearchServ "Search Service" $pass}
     
-    $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'searchapppool']")
-    $mgdAcctNode.Username = $netbios + "\" + $SearchAP
-    $mgdAcctNode.Password = "$pass"
-
-    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ApplicationPool.Account = $netbios + "\" + $SearchAP
-    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ApplicationPool.Password = "$pass"
-    #$AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.AdminComponent.ApplicationPool.Account = $netbios + "\" + $SearchAP
-    
-    $SearchServ = $AcctPrefix + "SP_SearchServ"
-    if(UserExists $SearchServ){$pass = Read-Host "User $SearchServ Exists! Please enter existing Password ";CreateServAcct $SearchServ "Search Service" $pass}
-    else{$pass = Get-ComplexPassword; CreateServAcct $SearchServ "Search Service" $pass}
-
+    $UserLogEntry = "Search Service" + " = " + $netbios + "\" + $SearchServ + " " + $pass    
+    $UserLogEntry | out-file "$text" -append
+ 
     $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'searchservice']")
     $mgdAcctNode.Username = $netbios + "\" + $SearchServ
     $mgdAcctNode.Password = "$pass"
-    
-    #$AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Account = $netbios + "\" + $SearchServ
-    #$AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Password = "$pass"
         
-    $SearchCrawl = $AcctPrefix + "SP_SearchCrawl"
-    if(UserExists $SearchCrawl){$pass = Read-Host "User $SearchCrawl Exists! Please enter existing Password ";CreateServAcct $SearchCrawl "Search Crawl" $pass}
-    else{$pass = Get-ComplexPassword; CreateServAcct $SearchCrawl "Search Crawl" $pass}
-
+    if($customSA -eq "Y" -or $customSA -eq "y")
+    {
+        $input = Read-Host "Please enter the Search Crawl Account "
+        $SearchCrawl = $AcctPrefix + $input
+    }
+    else{$SearchCrawl = $AcctPrefix + "SP_Crawl"}
+    if(UserExists $SearchCrawl){$pass = Read-Host "User $SearchCrawl Exists! Please enter existing Password "}
+    else{$pass = Get-ComplexPassword; New-ADUser $SearchCrawl "Search Crawl" $pass}
+    
+    $UserLogEntry = "Search Crawl" + " = " + $netbios + "\" + $SearchCrawl + " " + $pass    
+    $UserLogEntry | out-file "$text" -append
+ 
     $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ContentAccessAccount = $netbios + "\" + $SearchCrawl
     $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.ContentAccessAccountPassword = "$pass"
     
-    $UserProfileImport = $AcctPrefix + "SP_UPS"
-    if(UserExists $UserProfileImport){$pass = Read-Host "User $UserProfileImport Exists! Please enter existing Password ";CreateServAcct $UserProfileImport "User Profile Import" $pass}
-    else{$pass = Get-ComplexPassword; CreateServAcct $UserProfileImport "User Profile Import" $pass}
+    if($customSA -eq "Y" -or $customSA -eq "y")
+    {
+        $input = Read-Host "Please enter the UPS Sync Connection Account "
+        $UserProfileImport = $AcctPrefix + $input
+    }
+    else{$UserProfileImport = $AcctPrefix + "SP_UPS"}
+    if(UserExists $UserProfileImport){$pass = Read-Host "User $UserProfileImport Exists! Please enter existing Password "}
+    else{$pass = Get-ComplexPassword; New-ADUser $UserProfileImport "User Profile Import" $pass}
     
+    $UserLogEntry = "User Profile Import" + " = " + $netbios + "\" + $UserProfileImport + " " + $pass    
+    $UserLogEntry | out-file "$text" -append
+ 
     $AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SyncConnectionAccount = $netbios + "\" + $UserProfileImport
     $AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SyncConnectionAccountPassword = "$pass"
         
-    $CacheReader = $AcctPrefix + "SP_CacheReader"
-    if(UserExists $CacheReader){$pass = Read-Host "User $CacheReader Exists! Please enter existing Password ";CreateServAcct $CacheReader "Cache Reader" $pass}
-    else{$pass = Get-ComplexPassword; CreateServAcct $CacheReader "Cache Reader" $pass}
+    if($customSA -eq "Y" -or $customSA -eq "y")
+    {
+        $input = Read-Host "Please enter the Cache Reader Account "
+        $CacheReader = $AcctPrefix + $input
+    }
+    else{$CacheReader = $AcctPrefix + "SP_CacheRead"}
+    if(UserExists $CacheReader){$pass = Read-Host "User $CacheReader Exists! Please enter existing Password "}
+    else{$pass = Get-ComplexPassword; New-ADUser $CacheReader "Cache Reader" $pass}
     
+    $UserLogEntry = "Cache Reader" + " = " + $netbios + "\" + $CacheReader + " " + $pass    
+    $UserLogEntry | out-file "$text" -append
+ 
     $AutoSPXML.Configuration.Farm.ObjectCacheAccounts.SuperReader = $netbios + "\" + $CacheReader
     
-    $CacheUser = $AcctPrefix + "SP_CacheUser"
-    if(UserExists $CacheUser){$pass = Read-Host "User $CacheUser Exists! Please enter existing Password ";CreateServAcct $CacheUser "Cache User" $pass}
-    else{$pass = Get-ComplexPassword; CreateServAcct $CacheUser "Cache User" $pass}     
+    if($customSA -eq "Y" -or $customSA -eq "y")
+    {
+        $input = Read-Host "Please enter the Cache User Account "
+        $CacheUser = $AcctPrefix + $input
+    }
+    else{$CacheUser = $AcctPrefix + "SP_CacheUser"}
+    if(UserExists $CacheUser){$pass = Read-Host "User $CacheUser Exists! Please enter existing Password "}
+    else{$pass = Get-ComplexPassword; New-ADUser $CacheUser "Cache User" $pass}     
     
+    $UserLogEntry = "Cache User" + " = " + $netbios + "\" + $CacheUser + " " + $pass    
+    $UserLogEntry | out-file "$text" -append
+ 
     $AutoSPXML.Configuration.Farm.ObjectCacheAccounts.SuperUser = $netbios + "\" + $CacheUser    
 }
 if($AutoSPXML.Configuration.Install.SKU -eq "Enterprise")
-{
-    $ExcelUser = $AcctPrefix + "SP_ExcelUser"
-    if(UserExists $ExcelUser){$pass = Read-Host "User $ExcelUser Exists! Please enter existing Password ";CreateServAcct $ExcelUser "Excel User" $pass}
-    else{$pass = Get-ComplexPassword; CreateServAcct $ExcelUser "Excel User" $pass}
-
+    {
+        if($customSA -eq "Y" -or $customSA -eq "y")
+    {
+        $input = Read-Host "Please enter the Excel Unattended ID Account "
+        $ExcelUser = $AcctPrefix + $input
+    }
+    else{$ExcelUser = $AcctPrefix + "SP_ExcelID"}
+    if(UserExists $ExcelUser){$pass = Read-Host "User $ExcelUser Exists! Please enter existing Password "}
+    else{$pass = Get-ComplexPassword; New-ADUser $ExcelUser "Excel User" $pass}
+    
+    $UserLogEntry = "Excel ID" + " = " + $netbios + "\" + $ExcelUser + " " + $pass    
+    $UserLogEntry | out-file "$text" -append
+ 
     $uid = $netbios + "\" + $ExcelUser
 
     $AutoSPXML.Configuration.EnterpriseServiceApps.ExcelServices.UnattendedIDUser = [string]$uid
     $AutoSPXML.Configuration.EnterpriseServiceApps.ExcelServices.UnattendedIDPassword = [string]$pass
 
-    $VisioUser = $AcctPrefix + "SP_VisioUser"
-    if(UserExists $VisioUser){$pass = Read-Host "User $VisioUser Exists! Please enter existing Password ";CreateServAcct $VisioUser "Visio User" $pass}
-    else{$pass = Get-ComplexPassword; CreateServAcct $VisioUser "Visio User" $pass}
-
+    if($customSA -eq "Y" -or $customSA -eq "y")
+    {
+        $input = Read-Host "Please enter the Visio Unattended ID Account "
+        $VisioUser = $AcctPrefix + $input
+    }
+    else{$VisioUser = $AcctPrefix + "SP_VisioID"}
+    if(UserExists $VisioUser){$pass = Read-Host "User $VisioUser Exists! Please enter existing Password "}
+    else{$pass = Get-ComplexPassword; New-ADUser $VisioUser "Visio User" $pass}
+    
+    $UserLogEntry = "Visio ID" + " = " + $netbios + "\" + $VisioUser + " " + $pass    
+    $UserLogEntry | out-file "$text" -append
+ 
     $uid = $netbios + "\" + $VisioUser
 
     $AutoSPXML.Configuration.EnterpriseServiceApps.VisioService.UnattendedIDUser = [string]$uid
     $AutoSPXML.Configuration.EnterpriseServiceApps.VisioService.UnattendedIDPassword = [string]$pass
 
-    $PerfPointUser = $AcctPrefix + "SP_PerfPtUser"
-    if(UserExists $PerfPointUser){$pass = Read-Host "User $PerfPointUser Exists! Please enter existing Password ";CreateServAcct $PerfPointUser "PerfPoint User" $pass}
-    else{$pass = Get-ComplexPassword; CreateServAcct $PerfPointUser "PerfPoint User" $pass}
-
+    if($customSA -eq "Y" -or $customSA -eq "y")
+    {
+        $input = Read-Host "Please enter the PerformancePoint Unattended ID Account "
+        $PerfPointUser = $AcctPrefix + $input
+    }
+    else{$PerfPointUser = $AcctPrefix + "SP_PerfPtID"}
+    if(UserExists $PerfPointUser){$pass = Read-Host "User $PerfPointUser Exists! Please enter existing Password "}
+    else{$pass = Get-ComplexPassword; New-ADUser $PerfPointUser "PerfPoint User" $pass}
+    
+    $UserLogEntry = "PerfPoint ID" + " = " + $netbios + "\" + $PerfPointUser + " " + $pass    
+    $UserLogEntry | out-file "$text" -append
+ 
     $uid = $netbios + "\" + $PerfPointUser
 
     $AutoSPXML.Configuration.EnterpriseServiceApps.PerformancePointService.UnattendedIDUser = [string]$uid
