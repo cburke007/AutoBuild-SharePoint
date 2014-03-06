@@ -75,25 +75,33 @@ $FarmPrefix = Read-Host "Enter a Prefix to be used for Service Accounts in the F
 $AutoSPXML.Configuration.SAPrefix = "$FarmPrefix"
 
 #Choose the Database Prefix
-Write-Host -ForegroundColor Yellow "Choose your Database Prefix (Default == 1.) "
-Write-Host -ForegroundColor Cyan "1. $FarmPrefix"
-Write-Host -ForegroundColor Cyan "2. No Prefix"
-Write-Host -ForegroundColor Cyan "3. Enter a new Prefix"
-Write-Host -ForegroundColor Cyan " "
-$prefixChoice = Read-Host "Select 1-3: "
+Write-Host -ForegroundColor Yellow "Choose your Database Prefix (Default == Farm Prefix.) "
+Write-Host -ForegroundColor Cyan "1. No Prefix"
+Write-Host -ForegroundColor Cyan "2. Enter a new Prefix"
+if([string]::IsNullOrEmpty($FarmPrefix))
+{
+    Write-Host -ForegroundColor Cyan " "
+    $prefixChoice = Read-Host "Select 1-2: "
+}
+else
+{
+    Write-Host -ForegroundColor Cyan "3. $FarmPrefix"
+    Write-Host -ForegroundColor Cyan " "
+    $prefixChoice = Read-Host "Select 1-3: " 
+}
 
 switch($prefixChoice)
 {
 
     1{
-        $AutoSPXML.Configuration.Farm.Database.DBPrefix = [string]$FarmPrefix
-    }
-    2{
         $AutoSPXML.Configuration.Farm.Database.DBPrefix = ""
     }
-    3{
+    2{
         $pfx = Read-Host "Enter a Prefix to use for the Databases in the Farm "
         $AutoSPXML.Configuration.Farm.Database.DBPrefix = "$pfx"
+    }
+    3{
+        $AutoSPXML.Configuration.Farm.Database.DBPrefix = [string]$FarmPrefix
     }    
     default{$AutoSPXML.Configuration.Farm.Database.DBPrefix = [string]$FarmPrefix}
 }
@@ -210,8 +218,15 @@ else{$portalAppNode.SiteCollections.SiteCollection.Template = "$portalTemplate"}
 if([string]::IsNullOrEmpty($portalUrl))
 {
     $portalAppNode.Url = "http://portal.racktest.local"
+    $portalAppNode.SiteCollections.SiteCollection.siteUrl = "http://portal.racktest.local/"
+    $portalAppNode.SiteCollections.SiteCollection.SearchUrl = "http://portal.racktest.local/search"
 }
-else{$portalAppNode.Url = "$portalUrl"}
+else
+{
+    $portalAppNode.Url = "$portalUrl"
+    $portalAppNode.SiteCollections.SiteCollection.siteUrl = "$portalUrl/"
+    $portalAppNode.SiteCollections.SiteCollection.SearchUrl = "$portalUrl/search"
+}
 
 if([string]::IsNullOrEmpty($mySiteName))
 {
@@ -226,9 +241,15 @@ else
 
 if([string]::IsNullOrEmpty($mySiteUrl))
 {
-    $mSiteAppNode.Url = "http://mysite.racktest.local"
+    $mySiteAppNode.Url = "http://mysite.racktest.local"
+    $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "http://mysite.racktest.local/"
+    $mySiteAppNode.SiteCollections.SiteCollection.SearchUrl = "http://mysite.racktest.local/search"
 }
-else{$mySiteAppNode.Url = "$mySiteUrl"}
+else{
+    $mySiteAppNode.Url = "$mySiteUrl"
+    $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "$mySiteUrl/"
+    $mySiteAppNode.SiteCollections.SiteCollection.SearchUrl = "$mySiteUrl/search" 
+}
 
 
 # Populate Server/Service Architecture

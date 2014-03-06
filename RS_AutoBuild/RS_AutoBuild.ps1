@@ -26,17 +26,26 @@ $env:AutoSPPath = $bits + "\AutoSPInstaller"
 $AutoSPXML = [xml](get-content "$env:AutoSPPath\AutoSPInstallerInput.xml" -EA 0)
 
 # Create Service Account Config XML if it does not exist and populate Service Accounts
-if ($AutoSPXML -eq $null)
+if ([string]::IsNullOrEmpty($AutoSPXML))
 {
-    
-    
     ./RS_AutoBuildSetVars.ps1
     
     # Get a fresh copy of the AutoSPInstaller Config XML file
     $AutoSPXML = [xml](get-content "$env:AutoSPPath\AutoSPInstallerInput.xml" -EA 0)
-
-    ./RS_AutoBuildSetServAccts.ps1
 }
+else{Write-Host -ForegroundColor Yellow "AutoSPInstallerInput.xml Exists! - Skipping data input process..."}
+
+$cInfo = (get-content "$env:dp0\COREInfo.txt" -EA 0)
+if([string]::IsNullOrEmpty(($cInfo | Select-String -pattern "Farm Admin")))
+{
+    $continue = Read-Host "Continue with User Creation? (Y/n) "
+    if($continue -eq 'Y' -or $continue -eq 'y')
+    {
+        ./RS_AutoBuildSetServAccts.ps1
+    }
+    else{break}
+}
+else{Write-Host -ForegroundColor Yellow "Service Accounts already logged in COREInfo.txt - Skipping User creation..."}
 
 #Choose the edition of SharePoint you are installing
 Write-Host -ForegroundColor Yellow "How would you like to proceed?"
