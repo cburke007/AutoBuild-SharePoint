@@ -82,6 +82,9 @@ Write-Host -ForegroundColor White " - Setting power management plan to `"High Pe
 Start-Process -FilePath "$env:SystemRoot\system32\powercfg.exe" -ArgumentList "/s 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c" -NoNewWindow
 #EndRegion
 
+# Configure Rackspace Specific Pre-Requisites
+Set-RSPreReqs
+
 #Region Remote Install
 Function Install-Remote
 {
