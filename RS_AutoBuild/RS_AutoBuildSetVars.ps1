@@ -283,6 +283,21 @@ if($Edition -eq "Foundation")
                         if($wfe -eq ""){$wfe = $serverName}
                         else{$wfe = $wfe + ", " + $serverName}
 
+                        $CurrWFEServers = $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication.Start
+                        if($CurrWFEServers -eq "false"){$NewWFEServers = $serverName}
+                        else{$NewWFEServers = $CurrWFEServers + ", " + $serverName}
+                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication("Start", $NewWFEServers)
+
+                        $CurrDistCacheServers = $AutoSPXML.Configuration.Farm.Services.DistributedCache.Start
+                        if($CurrDistCacheServers -eq "false"){$NewDistCacheServers = $serverName}
+                        else{$NewDistCacheServers = $CurrDistCacheServers + ", " + $serverName}
+                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication("Start", $NewDistCacheServers)
+
+                        $CurrWFTimerServers = $AutoSPXML.Configuration.Farm.Services.WorkflowTimer.Start
+                        if($CurrWFTimerServers -eq "false"){$NewWFTimerServers = $serverName}
+                        else{$NewWFTimerServers = $CurrWFTimerServers + ", " + $serverName}
+                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication("Start", $NewWFTimerServers)
+
                         $entSearch = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication
                         $newQueryServerNode = $AutoSPXML.CreateElement("Server")
                         $newQueryServerNode.SetAttribute("Name",$serverName)
@@ -367,7 +382,7 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
         {
             #Choose the edition of SharePoint 2010 you are installing
             Write-Host -ForegroundColor Yellow "Choose a Role for server $serverName "
-            Write-Host -ForegroundColor Cyan "1. Web Front-End" 
+            Write-Host -ForegroundColor Cyan "1. Web Front-End"  
             Write-Host -ForegroundColor Cyan "2. Application"
             Write-Host -ForegroundColor Cyan "3. Search Components"
             Write-Host -ForegroundColor Cyan "4. Database"
@@ -382,6 +397,21 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
                 1 { 
                         if($wfe -eq ""){$wfe = $serverName}
                         else{$wfe = $wfe + ", " + $serverName}
+
+                        $CurrWFEServers = $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication.Start
+                        if($CurrWFEServers -eq "false"){$NewWFEServers = $serverName}
+                        else{$NewWFEServers = $CurrWFEServers + ", " + $serverName}
+                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication("Start", $NewWFEServers)
+
+                        $CurrDistCacheServers = $AutoSPXML.Configuration.Farm.Services.DistributedCache.Start
+                        if($CurrDistCacheServers -eq "false"){$NewDistCacheServers = $serverName}
+                        else{$NewDistCacheServers = $CurrDistCacheServers + ", " + $serverName}
+                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication("Start", $NewDistCacheServers)
+
+                        $CurrWFTimerServers = $AutoSPXML.Configuration.Farm.Services.WorkflowTimer.Start
+                        if($CurrWFTimerServers -eq "false"){$NewWFTimerServers = $serverName}
+                        else{$NewWFTimerServers = $CurrWFTimerServers + ", " + $serverName}
+                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication("Start", $NewWFTimerServers)
                   }
                 2 {
                         if($apps -eq ""){$apps = $serverName}

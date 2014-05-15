@@ -118,15 +118,15 @@
                 <EmailAddress></EmailAddress>
                 <ReplyToEmail></ReplyToEmail>
             </OutgoingEmail>
-            <IncomingEmail Start="localhost" />
+            <IncomingEmail Start="false" />
             <!-- DistributedCache (SharePoint 2013 only) - Start should never be set to "false", only either "true" for ALL servers (usually not recommended either), or a comma-delimited list of specific servers (maximum 4 cache host servers per farm). -->
-            <DistributedCache Start="localhost" />
+            <DistributedCache Start="false" />
             <!-- As a general rule WorkflowTimer - Start should never be set to "false", only either "true" for all servers, or a comma-delimited list of specific servers.
                  Normally you would specify the same servers to provision WorkflowTimer as you would FoundationWebApplication below. -->
-            <WorkflowTimer Start="localhost" />
+            <WorkflowTimer Start="false" />
             <!-- As a general rule FoundationWebApplication - Start should never be set to "false", only either "true" for all servers, or a comma-delimited list of specific WFE servers.
                  *Note* if you want to remotely install dedicated WFEs in your farm (i.e. RemoteInstall Enable="true") you should name the servers here, in a comma separated list - e.g. Start="WFE1,WFE2,WFEx" -->
-            <FoundationWebApplication Start="localhost" />
+            <FoundationWebApplication Start="false" />
         </Services>
         <!-- The ManagedAccounts section configures all accounts that will be added to SharePoint as managed accounts. -->
         <ManagedAccounts>
