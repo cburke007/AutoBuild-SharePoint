@@ -286,17 +286,17 @@ if($Edition -eq "Foundation")
                         $CurrWFEServers = $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication.Start
                         if($CurrWFEServers -eq "false"){$NewWFEServers = $serverName}
                         else{$NewWFEServers = $CurrWFEServers + ", " + $serverName}
-                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication("Start", $NewWFEServers)
+                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication.SetAttribute("Start", $NewWFEServers)
 
                         $CurrDistCacheServers = $AutoSPXML.Configuration.Farm.Services.DistributedCache.Start
                         if($CurrDistCacheServers -eq "false"){$NewDistCacheServers = $serverName}
                         else{$NewDistCacheServers = $CurrDistCacheServers + ", " + $serverName}
-                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication("Start", $NewDistCacheServers)
+                        $AutoSPXML.Configuration.Farm.Services.DistributedCache.SetAttribute("Start", $NewDistCacheServers)
 
                         $CurrWFTimerServers = $AutoSPXML.Configuration.Farm.Services.WorkflowTimer.Start
                         if($CurrWFTimerServers -eq "false"){$NewWFTimerServers = $serverName}
                         else{$NewWFTimerServers = $CurrWFTimerServers + ", " + $serverName}
-                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication("Start", $NewWFTimerServers)
+                        $AutoSPXML.Configuration.Farm.Services.WorkflowTimer.SetAttribute("Start", $NewWFTimerServers)
 
                         $entSearch = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication
                         $newQueryServerNode = $AutoSPXML.CreateElement("Server")
@@ -401,17 +401,17 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
                         $CurrWFEServers = $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication.Start
                         if($CurrWFEServers -eq "false"){$NewWFEServers = $serverName}
                         else{$NewWFEServers = $CurrWFEServers + ", " + $serverName}
-                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication("Start", $NewWFEServers)
+                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication.SetAttribute("Start", $NewWFEServers)
 
                         $CurrDistCacheServers = $AutoSPXML.Configuration.Farm.Services.DistributedCache.Start
                         if($CurrDistCacheServers -eq "false"){$NewDistCacheServers = $serverName}
                         else{$NewDistCacheServers = $CurrDistCacheServers + ", " + $serverName}
-                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication("Start", $NewDistCacheServers)
+                        $AutoSPXML.Configuration.Farm.Services.DistributedCache.SetAttribute("Start", $NewDistCacheServers)
 
                         $CurrWFTimerServers = $AutoSPXML.Configuration.Farm.Services.WorkflowTimer.Start
                         if($CurrWFTimerServers -eq "false"){$NewWFTimerServers = $serverName}
                         else{$NewWFTimerServers = $CurrWFTimerServers + ", " + $serverName}
-                        $AutoSPXML.Configuration.Farm.Services.FoundationWebApplication("Start", $NewWFTimerServers)
+                        $AutoSPXML.Configuration.Farm.Services.WorkflowTimer.SetAttribute("Start", $NewWFTimerServers)
                   }
                 2 {
                         if($apps -eq ""){$apps = $serverName}
