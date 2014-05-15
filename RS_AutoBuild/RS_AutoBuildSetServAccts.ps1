@@ -375,7 +375,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Standard" -or $AutoSPXML.Configurat
     $UserLogEntry = "Search Service" + " = " + $netbios + "\" + $SearchServ + " " + $pass    
     $UserLogEntry | out-file "$text" -append
  
-    $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'searchservice']")
+    $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'SearchService']")
     $mgdAcctNode.Username = $netbios + "\" + $SearchServ
     $mgdAcctNode.Password = "$pass"
         
