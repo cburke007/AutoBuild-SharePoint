@@ -173,14 +173,21 @@ $AutoSPXML.Configuration.Farm.Passphrase = [string]$FarmPass
 
 if($Version -eq "2013")
 {
-    $AppDomain = Read-Host "What is the App Domain? (Leave blank if unknown...)"
+    $AppDomain = Read-Host "What is the App Domain? (Default: rackapps.local)"
+    if([string]::IsNullOrEmpty($AppPrefix))
+    {
+        $AppDomain = "rackapps.local"
+    }
     $AutoSPXML.Configuration.ServiceApps.AppManagementService.AppDomain = [string]$AppDomain
 
     "<b>App Domain:</b> $AppDomain" | out-file "$text" -Append
 
-    $AppPrefix = Read-Host "What is the App Prefix? (Leave blank if unknown...)"
+    $AppPrefix = Read-Host "What is the App Prefix? (Default: apps)"
+    if([string]::IsNullOrEmpty($AppPrefix))
+    {
+        $AppPrefix = "apps"
+    }
     $AutoSPXML.Configuration.ServiceApps.SubscriptionSettingsService.AppSiteSubscriptionName = [string]$AppPrefix
-
     "<b>App Prefix:</b> $AppPrefix" | out-file "$text" -Append
 }
 
