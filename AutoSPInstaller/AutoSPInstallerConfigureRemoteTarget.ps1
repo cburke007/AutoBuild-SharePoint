@@ -1,4 +1,4 @@
-
+﻿
 # Configures the server for WinRM and WSManCredSSP
 Write-Host "Configuring PowerShell remoting..."
 $winRM = Get-Service -Name winrm

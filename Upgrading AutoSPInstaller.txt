@@ -10,9 +10,8 @@ Set-RSPreReqs
 
 The resulting change in code should look like the following:
 
-#Region External Functions
-. "$env:dp0\AutoSPInstallerFunctions.ps1"
-. "$env:dp0\AutoSPInstallerFunctionsCustom.ps1"
+Write-Host -ForegroundColor White " - Setting power management plan to `"High Performance`"..."
+Start-Process -FilePath "$env:SystemRoot\system32\powercfg.exe" -ArgumentList "/s 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c" -NoNewWindow
 #EndRegion
 
 # Configure Rackspace Specific Pre-Requisites
