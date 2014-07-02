@@ -225,13 +225,13 @@ else{$portalAppNode.SiteCollections.SiteCollection.Template = "$portalTemplate"}
 if([string]::IsNullOrEmpty($portalUrl))
 {
     $portalAppNode.Url = "http://portal.racktest.local"
-    $portalAppNode.SiteCollections.SiteCollection.siteUrl = "http://portal.racktest.local/"
+    $portalAppNode.SiteCollections.SiteCollection.siteUrl = "http://portal.racktest.local"
     $portalAppNode.SiteCollections.SiteCollection.SearchUrl = "http://portal.racktest.local/search"
 }
 else
 {
     $portalAppNode.Url = "$portalUrl"
-    $portalAppNode.SiteCollections.SiteCollection.siteUrl = "$portalUrl/"
+    $portalAppNode.SiteCollections.SiteCollection.siteUrl = "$portalUrl"
     $portalAppNode.SiteCollections.SiteCollection.SearchUrl = "$portalUrl/search"
 }
 
@@ -249,12 +249,12 @@ else
 if([string]::IsNullOrEmpty($mySiteUrl))
 {
     $mySiteAppNode.Url = "http://mysite.racktest.local"
-    $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "http://mysite.racktest.local/"
+    $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "http://mysite.racktest.local"
     $mySiteAppNode.SiteCollections.SiteCollection.SearchUrl = "http://mysite.racktest.local/search"
 }
 else{
     $mySiteAppNode.Url = "$mySiteUrl"
-    $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "$mySiteUrl/"
+    $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "$mySiteUrl"
     $mySiteAppNode.SiteCollections.SiteCollection.SearchUrl = "$mySiteUrl/search" 
 }
 
@@ -595,7 +595,8 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
                         $AutoSPXML.Configuration.Farm.CentralAdmin.SetAttribute("Provision", $serverName)
                   } 
                 6 {
-                        $AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SetAttribute("Provision", $serverName)
+                        Write-Host  -ForegroundColor Yellow "User Profile Service App Provisioning is currently disabled in this script. Please provision manually once the Farm is built. Thanks!" 
+                        #$AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SetAttribute("Provision", $serverName)
                   }        
             }
         
