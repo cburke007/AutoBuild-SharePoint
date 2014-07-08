@@ -621,12 +621,15 @@ $ca = $AutoSPXML.Configuration.Farm.CentralAdmin.Provision
 "<b>Central Admin:</b> $ca" | out-file "$text" -Append
 
 $indexCrawl = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.IndexComponent.Server.Name
-$indexScrubbed = $indexCrawl.Replace(" ", ", ")
-"<b>Index Crawler:</b> $indexScrubbed" | out-file "$text" -Append
+if(![string]::IsNullOrEmpty($indexCrawl))
+{
+    $indexScrubbed = $indexCrawl.Replace(" ", ", ")
+    "<b>Index Crawler:</b> $indexScrubbed" | out-file "$text" -Append
 
-$query = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
-$queryScrubbed = $query.Replace(" ", ", ")
-"<b>Query:</b> $queryScrubbed" | out-file "$text" -Append
+    $query = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
+    $queryScrubbed = $query.Replace(" ", ", ")
+    "<b>Query:</b> $queryScrubbed" | out-file "$text" -Append
+}
 
 $dbServer = $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance
 "<b>Database:</b> $dbServer" | out-file "$text" -Append
