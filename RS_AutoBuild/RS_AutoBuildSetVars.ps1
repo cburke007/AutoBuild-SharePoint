@@ -267,6 +267,10 @@ $apps = ""
 
 if($Edition -eq "Foundation")
 {   
+    # Remove the Search Service user from the Managed Accounts Node since it is not needed for Foundation
+    $searchUser = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'SearchService']")
+    $searchUser.ParentNode.RemoveChild($searchUser)
+    
     for($i=1; $i -le $numServers; $i++)
     {
         $serverName = Read-Host "What is the name of Server $i ? "   
