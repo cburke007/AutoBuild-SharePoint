@@ -195,14 +195,10 @@ if($Version -eq "2013")
 
 $portalName = Read-Host "Enter the Name for the first Portal Site (Leave blank for 'Portal') "
 $portalUrl = Read-Host "Enter the URL for the first Portal Site (Leave blank for 'http://portal.racktest.local') "
-
 $portalTemplate = Read-Host "Enter the Name of the SP Web Template for the $portalName Site (Leave blank for STS#0) "
-
-$mySiteName = Read-Host "Enter the Name for the MySite Host Site (Leave blank for 'MySite Host') "
-$mySiteUrl = Read-Host "Enter the URL for the MySite Host Site (Leave blank for 'http://mysite.racktest.local') "
-
 $portalAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "Portal"}
-$mySiteAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "MySiteHost"}
+
+
 
 if([string]::IsNullOrEmpty($portalName))
 {
@@ -235,29 +231,41 @@ else
     $portalAppNode.SiteCollections.SiteCollection.SearchUrl = "$portalUrl/search"
 }
 
-if([string]::IsNullOrEmpty($mySiteName))
+if($Edition -eq "Standard" -or $Edition -eq "Enterprise")
 {
-    $mySiteAppNode.Name = "MySite Host"
-    $mySiteAppNode.ApplicationPool = "MySite App Pool"
+    $mySiteName = Read-Host "Enter the Name for the MySite Host Site (Leave blank for 'MySite Host') "
+    $mySiteUrl = Read-Host "Enter the URL for the MySite Host Site (Leave blank for 'http://mysite.racktest.local') "
+    $mySiteAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "MySiteHost"}
+
+    if([string]::IsNullOrEmpty($mySiteName))
+    {
+        $mySiteAppNode.Name = "MySite Host"
+        $mySiteAppNode.ApplicationPool = "MySite App Pool"
+    }
+    else
+    {
+        $mySiteAppNode.Name = "$mySiteName"
+        $mySiteAppNode.ApplicationPool = "$mySiteName" + " App Pool"
+    }
+
+    if([string]::IsNullOrEmpty($mySiteUrl))
+    {
+        $mySiteAppNode.Url = "http://mysite.racktest.local"
+        $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "http://mysite.racktest.local"
+        $mySiteAppNode.SiteCollections.SiteCollection.SearchUrl = "http://mysite.racktest.local/search"
+    }
+    else{
+        $mySiteAppNode.Url = "$mySiteUrl"
+        $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "$mySiteUrl"
+        $mySiteAppNode.SiteCollections.SiteCollection.SearchUrl = "$mySiteUrl/search" 
+    }
 }
 else
 {
-    $mySiteAppNode.Name = "$mySiteName"
-    $mySiteAppNode.ApplicationPool = "$mySiteName" + " App Pool"
+    # Remove the Mysite Web Application node since it is not used in Foundation
+    $mySiteNode = $AutoSPXML.SelectSingleNode("//Configuration/WebApplications/WebApplication[@type = 'MySiteHost']")
+    $mySiteNode.ParentNode.RemoveChild($mySiteNode) | Out-Null
 }
-
-if([string]::IsNullOrEmpty($mySiteUrl))
-{
-    $mySiteAppNode.Url = "http://mysite.racktest.local"
-    $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "http://mysite.racktest.local"
-    $mySiteAppNode.SiteCollections.SiteCollection.SearchUrl = "http://mysite.racktest.local/search"
-}
-else{
-    $mySiteAppNode.Url = "$mySiteUrl"
-    $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "$mySiteUrl"
-    $mySiteAppNode.SiteCollections.SiteCollection.SearchUrl = "$mySiteUrl/search" 
-}
-
 
 # Populate Server/Service Architecture
 $numServers = Read-Host "How many servers are in this Farm? "
@@ -269,7 +277,11 @@ if($Edition -eq "Foundation")
 {   
     # Remove the Search Service user from the Managed Accounts Node since it is not needed for Foundation
     $searchUser = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'SearchService']")
-    $searchUser.ParentNode.RemoveChild($searchUser)
+    $searchUser.ParentNode.RemoveChild($searchUser) | Out-Null
+
+    $searchUser = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'MySiteHost']")
+    $searchUser.ParentNode.RemoveChild($searchUser) | Out-Null
+    
     
     for($i=1; $i -le $numServers; $i++)
     {
