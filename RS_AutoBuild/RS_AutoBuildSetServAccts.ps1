@@ -2,130 +2,63 @@
 # BEGIN FUNCTIONS
 #########################################################################################################
 
-function New-ADUser
+function CreateADUser
 {
 	param([string]$AccountName, [string]$type, [string]$Password)
     
     #Region Create AD Service Accounts
     #Get AD Information
     #Connect to current domain
-    $dom = [System.DirectoryServices.ActiveDirectory.Domain]::getcurrentdomain()
+    $dom = Get-ADDomain
     #Construct a valid UPN
-    $UPN = "@" + $dom.Name
-
-    #Construct connection strings to AD
-    $rootDSE = [ADSI]'LDAP://RootDSE'
-    $strdomain = "LDAP://OU=SharePoint,OU=Service Accounts," + $rootDSE.defaultNamingContext
-    $domain = [ADSI]$strdomain
+    $UPN = "@" + $dom.DNSRoot
    
-
     #Check to see if the Service Accounts OU already exists
-    $rootAD = New-Object System.DirectoryServices.DirectoryEntry
-    $search = [System.DirectoryServices.DirectorySearcher]$rootAD
-    $search.Filter = "(&(name=Service Accounts)(objectCategory=organizationalunit))"
-    $OUSAExists = $search.FindOne()
+    $ouSA = "OU=Service Accounts," + $dom.DistinguishedName
+    $ouSP = "OU=SharePoint," + $ouSA
+    $ouSAExists = Get-ADOrganizationalUnit -identity $ouSA
 
-    #If the Service Accounts OU exists, Check for the SharePoint OU
-    if ($OUSAExists -ne $null)
+    #If the Service Accounts does not exist, create both OU's
+    if ([string]::IsNullOrEmpty($ouSAExists))
     {
-        $strSAOU = "LDAP://OU=Service Accounts," + $rootDSE.defaultNamingContext
-        $SAOU = [ADSI]$strSAOU
+        New-ADOrganizationalUnit -Name "Service Accounts" -Path $ouSA
         
-        #Check to see if the SharePoint OU already exists
-        $search = [System.DirectoryServices.DirectorySearcher]$rootAD
-        $search.Filter = "(&(name=SharePoint)(objectCategory=organizationalunit))"
-        $OUSPExists = $search.FindOne()
-        
-        #If the SharePoint OU does not exist, Create it
-        if ($OUSPExists -eq $null)
-        {
-            $ou = $SAOU.Create("organizationalunit", "ou=SharePoint")
-            $ou.SetInfo()
-        }    
+        New-ADOrganizationalUnit -Name "SharePoint" -Path $ouSP    
     }
-    #Otherwise create both the Service Accounts and SharePoint OUs
+    #Otherwise create just the SharePoint OU
     else
     {
-        $ou = $rootAD.Create("organizationalunit", "ou=Service Accounts")
-        $ou.SetInfo()
-        
-        $strSAOU = "LDAP://OU=Service Accounts," + $rootDSE.defaultNamingContext
-        $SAOU = [ADSI]$strSAOU
-        
-        $ou = $SAOU.Create("organizationalunit", "ou=SharePoint")
-        $ou.SetInfo()
+        #Check to see if the SharePoint OU already exists
+        $ouSP = "OU=SharePoint,OU=Service Accounts," + $dom.DistinguishedName
+        $ouSPExists = Get-ADOrganizationalUnit -identity $ouSP
+
+        #If the SharePoint OU does not exist, Create it
+        if ([string]::IsNullOrEmpty($ouSPExists))
+        {
+            New-ADOrganizationalUnit -Name "SharePoint" -Path $ouSP
+        }  
     }
     
     #Check to see if the user already exists
-    $search = [System.DirectoryServices.DirectorySearcher]$rootAD
-    $search.Filter = "(sAMAccountName=$AccountName)"
-    $UserExists = $search.FindAll()  
+    $UserExists = Get-ADUser -filter {SamAccountName -eq $AccountName}
+      
     
     #If the user exists do nothing otherwise create the new user account
-    if($UserExists -ne $null)
+    if(![string]::IsNullOrEmpty($UserExists))
     {        
         Write-Output "User $AccountName exists! Skipping..."      
     }
     else
     {                     
+        $userPrincipalName = $AccountName + $UPN
         # User Creation
-        $newuser = $domain.create("user","cn=" + $AccountName)
-        $newuser.setinfo()
-        $newuser.samaccountname = $AccountName
-        $newuser.setinfo()
-        $newuser.givenname = $AccountName
-        $newuser.displayname = $AccountName
-        $newuser.userprincipalname = $AccountName + $UPN
-        $newuser.setinfo()
-        $newuser.SetPassword($Password)
-        $newuser.setinfo()
-        $newuser.userAccountControl = 66048
-        $newuser.setinfo()
+        $newUser = New-ADUser $AccountName -PassThru -Path $ouSP -SamAccountName $AccountName -UserPrincipalName $userPrincipalName -DisplayName $AccountName -GivenName $AccountName -Enabled $True -PasswordNeverExpires $True -AccountPassword (ConvertTo-SecureString $Password -AsPlainText -Force)
 
         if($type -eq "Farm Admin")
         {
-            $groupPath = "LDAP://CN=Domain Admins, CN=Users," + $rootDSE.defaultNamingContext
-            $group = [ADSI]$groupPath
-            $members = $group.member
-            $group.member = $members + $newUser.distinguishedName
-            $group.setinfo()
+            Add-ADGroupMember -Identity "Domain Admins" -Member $newUser
         }
-
-    }
-
-    
-}
-
-#Function Get NetBios Name for current AD
-function Get-LocalLogonInformation
-{
-    try
-    {
-
-        $ADSystemInfo = New-Object -ComObject ADSystemInfo
-
-        $type = $ADSystemInfo.GetType()
-
-        New-Object -TypeName PSObject -Property @{
-
-            UserDistinguishedName = $type.InvokeMember('UserName','GetProperty',$null,$ADSystemInfo,$null)
-            ComputerDistinguishedName = $type.InvokeMember('ComputerName','GetProperty',$null,$ADSystemInfo,$null)
-            SiteName = $type.InvokeMember('SiteName','GetProperty',$null,$ADSystemInfo,$null)
-            DomainShortName = $type.InvokeMember('DomainShortName','GetProperty',$null,$ADSystemInfo,$null)
-            DomainDNSName = $type.InvokeMember('DomainDNSName','GetProperty',$null,$ADSystemInfo,$null)
-            ForestDNSName = $type.InvokeMember('ForestDNSName','GetProperty',$null,$ADSystemInfo,$null)
-            PDCRoleOwnerDistinguishedName = $type.InvokeMember('PDCRoleOwner','GetProperty',$null,$ADSystemInfo,$null)
-            SchemaRoleOwnerDistinguishedName = $type.InvokeMember('SchemaRoleOwner','GetProperty',$null,$ADSystemInfo,$null)
-            IsNativeModeDomain = $type.InvokeMember('IsNativeMode','GetProperty',$null,$ADSystemInfo,$null)
-        }
-
-    }
-
-    catch
-    {
-
-        throw
-    }
+    } 
 }
 
 #Generate a new random password
@@ -152,10 +85,15 @@ function Get-RandomText {
 }
 
 function Get-ComplexPassword {
-    $password = Get-RandomPassword -length 3 -characters 'abcdefghiklmnprstuvwxyz'
-    #$password += Get-RandomPassword -length 2 -characters '#*+)'
-    $password += Get-RandomPassword -length 3 -characters '123456789'
-    $password += Get-RandomPassword -length 3 -characters 'ABCDEFGHKLMNPRSTUVWXYZ'
+    param($passLength)
+
+    $segLength = [System.Math]::Floor($passLength / 4)
+    $remainder = $passLength % 4 + $segLength + 1
+
+    $password = Get-RandomPassword -length $segLength -characters 'abcdefghiklmnprstuvwxyz'
+    $password += Get-RandomPassword -length $segLength -characters '123456789'
+    $password += Get-RandomPassword -length $segLength -characters 'ABCDEFGHKLMNPRSTUVWXYZ'
+    $password += Get-RandomPassword -length $remainder -characters '#*+()$!?'
 
     Get-RandomText $password
 }
@@ -183,7 +121,6 @@ Function Set-SQLAccess
 		Write-Warning " - Connection failed to SQL server or instance `"$DBServer`"!"
 		Write-Warning " - Check the server (or instance) name, or verify rights for the Current Logged on User."
 		$SqlCmd.Connection.Close()
-		Suspend-Script
 		break
 	}	
 	$SqlCmd.Connection.Close()
@@ -194,12 +131,7 @@ function UserExists
 {
     param([string]$uname)
     
-    $rootAD = New-Object System.DirectoryServices.DirectoryEntry
-    
-    #Check to see if the user already exists
-    $search = [System.DirectoryServices.DirectorySearcher]$rootAD
-    $search.Filter = "(sAMAccountName=$uname)"
-    $UserExists = $search.FindAll()
+    $UserExists = Get-ADUser -filter {SamAccountName -eq $uname}
     $UserExists
 }
 
@@ -213,7 +145,12 @@ $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
 $bits = Get-Item $env:dp0 | Split-Path -Parent
 $env:AutoSPPath = $bits + "\AutoSPInstaller"
 
-$netbios = (Get-LocalLogonInformation).DomainShortName
+$RootDSE = Get-ADRootDSE
+$PasswordPolicy = Get-ADObject $RootDSE.defaultNamingContext -Property minPwdAge, maxPwdAge, minPwdLength, pwdHistoryLength, pwdProperties
+if($PasswordPolicy.minPwdLength -lt 12){$passlength = 12}
+else{$passLength = $PasswordPolicy.minPwdLength}
+
+$netbios = (Get-ADDomain).NetBiosName
 
 $text = "$env:dp0\COREInfo.txt"
 
@@ -237,7 +174,14 @@ else{$AcctPrefix = $prefix + "-"}
 # Set Farm Service Account Names
 Write-Host -ForegroundColor Yellow "Creating Service Accounts..."
 
-$customSA = Read-Host "Do you wish to use custom service accounts (Y/N - Default = N)? "
+$customSA = Read-Host "Do you wish to use custom service accounts (y/N - Default = N)? "
+$customPWLength = Read-Host "Do you wish to use a custom password length (y/N - Default = $passLength)? "
+
+if($customPWLength -eq "Y" -or $customPWLength -eq "y")
+{
+    $input = Read-Host "Please enter the password length "
+    $passLength = $input
+}
 
 if($customSA -eq "Y" -or $customSA -eq "y")
 {
@@ -246,7 +190,7 @@ if($customSA -eq "Y" -or $customSA -eq "y")
 }
 else{$FarmAdmin = $AcctPrefix + "SP_Admin"}
 if(UserExists $FarmAdmin){$pass = Read-Host "User $FarmAdmin Exists! Please enter existing Password "}
-else{$pass = Get-ComplexPassword; New-ADUser $FarmAdmin "Farm Admin" $pass}
+else{$pass = Get-ComplexPassword $passLength; CreateADUser $FarmAdmin "Farm Admin" $pass}
 $FarmAdminPass = $pass
    
 $UserLogEntry = "Farm Admin" + " = " + $netbios + "\" + $FarmAdmin + " " + $pass    
@@ -272,7 +216,7 @@ if($customSA -eq "Y" -or $customSA -eq "y")
 }
 else{$FarmAcct = $AcctPrefix + "SP_Connect"}
 if(UserExists $FarmAcct){$pass = Read-Host "User $FarmAcct Exists! Please enter existing Password "}
-else{$pass = Get-ComplexPassword; New-ADUser $FarmAcct "Farm Connect" $pass}
+else{$pass = Get-ComplexPassword $passLength; CreateADUser $FarmAcct "Farm Connect" $pass}
    
 $UserLogEntry = "Farm Account" + " = " + $netbios + "\" + $FarmAcct + " " + $pass    
 $UserLogEntry | out-file "$text" -append
@@ -301,7 +245,7 @@ if($customSA -eq "Y" -or $customSA -eq "y")
 }
 else{$ServiceAppAP = $AcctPrefix + "SP_SA_AP"}
 if(UserExists $ServiceAppAP){$pass = Read-Host "User $ServiceAppAP Exists! Please enter existing Password "}
-else{$pass = Get-ComplexPassword; New-ADUser $ServiceAppAP "Default SA AppPool" $pass}
+else{$pass = Get-ComplexPassword $passLength; CreateADUser $ServiceAppAP "Default SA AppPool" $pass}
    
 $UserLogEntry = "Default SA AppPool" + " = " + $netbios + "\" + $ServiceAppAP + " " + $pass    
 $UserLogEntry | out-file "$text" -append
@@ -317,7 +261,7 @@ if($customSA -eq "Y" -or $customSA -eq "y")
 }
 else{$SiteAdmin = $AcctPrefix + "Site_Admin"}
 if(UserExists $SiteAdmin){$pass = Read-Host "User $SiteAdmin Exists! Please enter existing Password "}
-else{$pass = Get-ComplexPassword; New-ADUser $SiteAdmin "Default Site Admin" $pass}
+else{$pass = Get-ComplexPassword $passLength; CreateADUser $SiteAdmin "Default Site Admin" $pass}
 
 $UserLogEntry = "Default Site Admin" + " = " + $netbios + "\" + $SiteAdmin + " " + $pass    
 $UserLogEntry | out-file "$text" -append
@@ -329,7 +273,7 @@ if($customSA -eq "Y" -or $customSA -eq "y")
 }
 else{$SiteAP = $AcctPrefix + "SP_Site_AP"}
 if(UserExists $SiteAP){$pass = Read-Host "User $SiteAP Exists! Please enter existing Password "}
-else{$pass = Get-ComplexPassword; New-ADUser $SiteAP "Default Site AppPool" $pass}
+else{$pass = Get-ComplexPassword $passLength; CreateADUser $SiteAP "Default Site AppPool" $pass}
 
 $UserLogEntry = "Default Site AppPool" + " = " + $netbios + "\" + $SiteAP + " " + $pass    
 $UserLogEntry | out-file "$text" -append
@@ -370,7 +314,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Standard" -or $AutoSPXML.Configurat
     }
     else{$SearchServ = $AcctPrefix + "SP_SearchSvc"}
     if(UserExists $SearchServ){$pass = Read-Host "User $SearchServ Exists! Please enter existing Password "}
-    else{$pass = Get-ComplexPassword; New-ADUser $SearchServ "Search Service" $pass}
+    else{$pass = Get-ComplexPassword $passLength; CreateADUser $SearchServ "Search Service" $pass}
     
     $UserLogEntry = "Search Service" + " = " + $netbios + "\" + $SearchServ + " " + $pass    
     $UserLogEntry | out-file "$text" -append
@@ -386,7 +330,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Standard" -or $AutoSPXML.Configurat
     }
     else{$SearchCrawl = $AcctPrefix + "SP_Crawl"}
     if(UserExists $SearchCrawl){$pass = Read-Host "User $SearchCrawl Exists! Please enter existing Password "}
-    else{$pass = Get-ComplexPassword; New-ADUser $SearchCrawl "Search Crawl" $pass}
+    else{$pass = Get-ComplexPassword $passLength; CreateADUser $SearchCrawl "Search Crawl" $pass}
     
     $UserLogEntry = "Search Crawl" + " = " + $netbios + "\" + $SearchCrawl + " " + $pass    
     $UserLogEntry | out-file "$text" -append
@@ -401,7 +345,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Standard" -or $AutoSPXML.Configurat
     }
     else{$UserProfileImport = $AcctPrefix + "SP_UPS"}
     if(UserExists $UserProfileImport){$pass = Read-Host "User $UserProfileImport Exists! Please enter existing Password "}
-    else{$pass = Get-ComplexPassword; New-ADUser $UserProfileImport "User Profile Import" $pass}
+    else{$pass = Get-ComplexPassword $passLength; CreateADUser $UserProfileImport "User Profile Import" $pass}
     
     $UserLogEntry = "User Profile Import" + " = " + $netbios + "\" + $UserProfileImport + " " + $pass    
     $UserLogEntry | out-file "$text" -append
@@ -416,7 +360,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Standard" -or $AutoSPXML.Configurat
     }
     else{$CacheReader = $AcctPrefix + "SP_CacheRead"}
     if(UserExists $CacheReader){$pass = Read-Host "User $CacheReader Exists! Please enter existing Password "}
-    else{$pass = Get-ComplexPassword; New-ADUser $CacheReader "Cache Reader" $pass}
+    else{$pass = Get-ComplexPassword $passLength; CreateADUser $CacheReader "Cache Reader" $pass}
     
     $UserLogEntry = "Cache Reader" + " = " + $netbios + "\" + $CacheReader + " " + $pass    
     $UserLogEntry | out-file "$text" -append
@@ -430,7 +374,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Standard" -or $AutoSPXML.Configurat
     }
     else{$CacheUser = $AcctPrefix + "SP_CacheUser"}
     if(UserExists $CacheUser){$pass = Read-Host "User $CacheUser Exists! Please enter existing Password "}
-    else{$pass = Get-ComplexPassword; New-ADUser $CacheUser "Cache User" $pass}     
+    else{$pass = Get-ComplexPassword $passLength; CreateADUser $CacheUser "Cache User" $pass}     
     
     $UserLogEntry = "Cache User" + " = " + $netbios + "\" + $CacheUser + " " + $pass    
     $UserLogEntry | out-file "$text" -append
@@ -446,7 +390,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Enterprise")
     }
     else{$ExcelUser = $AcctPrefix + "SP_ExcelID"}
     if(UserExists $ExcelUser){$pass = Read-Host "User $ExcelUser Exists! Please enter existing Password "}
-    else{$pass = Get-ComplexPassword; New-ADUser $ExcelUser "Excel User" $pass}
+    else{$pass = Get-ComplexPassword $passLength; CreateADUser $ExcelUser "Excel User" $pass}
     
     $UserLogEntry = "Excel ID" + " = " + $netbios + "\" + $ExcelUser + " " + $pass    
     $UserLogEntry | out-file "$text" -append
@@ -463,7 +407,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Enterprise")
     }
     else{$VisioUser = $AcctPrefix + "SP_VisioID"}
     if(UserExists $VisioUser){$pass = Read-Host "User $VisioUser Exists! Please enter existing Password "}
-    else{$pass = Get-ComplexPassword; New-ADUser $VisioUser "Visio User" $pass}
+    else{$pass = Get-ComplexPassword $passLength; CreateADUser $VisioUser "Visio User" $pass}
     
     $UserLogEntry = "Visio ID" + " = " + $netbios + "\" + $VisioUser + " " + $pass    
     $UserLogEntry | out-file "$text" -append
@@ -480,7 +424,7 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Enterprise")
     }
     else{$PerfPointUser = $AcctPrefix + "SP_PerfPtID"}
     if(UserExists $PerfPointUser){$pass = Read-Host "User $PerfPointUser Exists! Please enter existing Password "}
-    else{$pass = Get-ComplexPassword; New-ADUser $PerfPointUser "PerfPoint User" $pass}
+    else{$pass = Get-ComplexPassword $passLength; CreateADUser $PerfPointUser "PerfPoint User" $pass}
     
     $UserLogEntry = "PerfPoint ID" + " = " + $netbios + "\" + $PerfPointUser + " " + $pass    
     $UserLogEntry | out-file "$text" -append

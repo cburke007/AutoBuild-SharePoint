@@ -1,5 +1,5 @@
 #* FileName: RS_AutoBuild.ps1
-#* Version 5.0
+#* Version 6.0
 #*=============================================
 #* Script Name: [RS_AutoBuild.ps1]
 #* Created: [4/2/2013]
@@ -14,7 +14,6 @@
 #* the installation of SharePoint 2010 and 2013
 #* via AutoSPInstaller
 #*============================================= 
-
 
 # Get current script execution path and the parent path
 $0 = $myInvocation.MyCommand.Definition
@@ -36,11 +35,12 @@ if ([string]::IsNullOrEmpty($AutoSPXML))
 else{Write-Host -ForegroundColor Yellow "AutoSPInstallerInput.xml Exists! - Skipping data input process..."}
 
 $cInfo = (get-content "$env:dp0\COREInfo.txt" -EA 0)
-if([string]::IsNullOrEmpty(($cInfo | Select-String -pattern "Farm Admin")))
+if([string]::IsNullOrEmpty(($cInfo | Select-String -pattern "<b>Sharepoint Products/Add-ons installed:</b> ")))
 {
     $continue = Read-Host "Continue with User Creation? (Y/n) "
     if($continue -eq 'Y' -or $continue -eq 'y')
     {
+        ./RS_AutoBuildPrep.ps1
         ./RS_AutoBuildSetServAccts.ps1
     }
     else{break}
