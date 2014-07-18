@@ -27,7 +27,7 @@ $AutoSPXML = [xml](get-content "$env:AutoSPPath\AutoSPInstallerInput.xml" -EA 0)
 # Create Service Account Config XML if it does not exist and populate Service Accounts
 if ([string]::IsNullOrEmpty($AutoSPXML))
 {
-    ./RS_AutoBuildSetVars.ps1
+    .\RS_AutoBuildSetVars.ps1
     
     # Get a fresh copy of the AutoSPInstaller Config XML file
     $AutoSPXML = [xml](get-content "$env:AutoSPPath\AutoSPInstallerInput.xml" -EA 0)
@@ -40,8 +40,8 @@ if([string]::IsNullOrEmpty(($cInfo | Select-String -pattern "<b>Sharepoint Produ
     $continue = Read-Host "Continue with User Creation? (Y/n) "
     if($continue -eq 'Y' -or $continue -eq 'y')
     {
-        ./RS_AutoBuildPrep.ps1
-        ./RS_AutoBuildSetServAccts.ps1
+        .\RS_AutoBuildPrep.ps1
+        .\RS_AutoBuildSetServAccts.ps1
     }
     else{break}
 }

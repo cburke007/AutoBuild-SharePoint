@@ -195,14 +195,10 @@ if($Version -eq "2013")
 
 $portalName = Read-Host "Enter the Name for the first Portal Site (Leave blank for 'Portal') "
 $portalUrl = Read-Host "Enter the URL for the first Portal Site (Leave blank for 'http://portal.racktest.local') "
-
 $portalTemplate = Read-Host "Enter the Name of the SP Web Template for the $portalName Site (Leave blank for STS#0) "
-
-$mySiteName = Read-Host "Enter the Name for the MySite Host Site (Leave blank for 'MySite Host') "
-$mySiteUrl = Read-Host "Enter the URL for the MySite Host Site (Leave blank for 'http://mysite.racktest.local') "
-
 $portalAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "Portal"}
-$mySiteAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "MySiteHost"}
+
+
 
 if([string]::IsNullOrEmpty($portalName))
 {
@@ -225,39 +221,51 @@ else{$portalAppNode.SiteCollections.SiteCollection.Template = "$portalTemplate"}
 if([string]::IsNullOrEmpty($portalUrl))
 {
     $portalAppNode.Url = "http://portal.racktest.local"
-    $portalAppNode.SiteCollections.SiteCollection.siteUrl = "http://portal.racktest.local/"
+    $portalAppNode.SiteCollections.SiteCollection.siteUrl = "http://portal.racktest.local"
     $portalAppNode.SiteCollections.SiteCollection.SearchUrl = "http://portal.racktest.local/search"
 }
 else
 {
     $portalAppNode.Url = "$portalUrl"
-    $portalAppNode.SiteCollections.SiteCollection.siteUrl = "$portalUrl/"
+    $portalAppNode.SiteCollections.SiteCollection.siteUrl = "$portalUrl"
     $portalAppNode.SiteCollections.SiteCollection.SearchUrl = "$portalUrl/search"
 }
 
-if([string]::IsNullOrEmpty($mySiteName))
+if($Edition -eq "Standard" -or $Edition -eq "Enterprise")
 {
-    $mySiteAppNode.Name = "MySite Host"
-    $mySiteAppNode.ApplicationPool = "MySite App Pool"
+    $mySiteName = Read-Host "Enter the Name for the MySite Host Site (Leave blank for 'MySite Host') "
+    $mySiteUrl = Read-Host "Enter the URL for the MySite Host Site (Leave blank for 'http://mysite.racktest.local') "
+    $mySiteAppNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "MySiteHost"}
+
+    if([string]::IsNullOrEmpty($mySiteName))
+    {
+        $mySiteAppNode.Name = "MySite Host"
+        $mySiteAppNode.ApplicationPool = "MySite App Pool"
+    }
+    else
+    {
+        $mySiteAppNode.Name = "$mySiteName"
+        $mySiteAppNode.ApplicationPool = "$mySiteName" + " App Pool"
+    }
+
+    if([string]::IsNullOrEmpty($mySiteUrl))
+    {
+        $mySiteAppNode.Url = "http://mysite.racktest.local"
+        $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "http://mysite.racktest.local"
+        $mySiteAppNode.SiteCollections.SiteCollection.SearchUrl = "http://mysite.racktest.local/search"
+    }
+    else{
+        $mySiteAppNode.Url = "$mySiteUrl"
+        $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "$mySiteUrl"
+        $mySiteAppNode.SiteCollections.SiteCollection.SearchUrl = "$mySiteUrl/search" 
+    }
 }
 else
 {
-    $mySiteAppNode.Name = "$mySiteName"
-    $mySiteAppNode.ApplicationPool = "$mySiteName" + " App Pool"
+    # Remove the Mysite Web Application node since it is not used in Foundation
+    $mySiteNode = $AutoSPXML.SelectSingleNode("//Configuration/WebApplications/WebApplication[@type = 'MySiteHost']")
+    $mySiteNode.ParentNode.RemoveChild($mySiteNode) | Out-Null
 }
-
-if([string]::IsNullOrEmpty($mySiteUrl))
-{
-    $mySiteAppNode.Url = "http://mysite.racktest.local"
-    $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "http://mysite.racktest.local/"
-    $mySiteAppNode.SiteCollections.SiteCollection.SearchUrl = "http://mysite.racktest.local/search"
-}
-else{
-    $mySiteAppNode.Url = "$mySiteUrl"
-    $mySiteAppNode.SiteCollections.SiteCollection.siteUrl = "$mySiteUrl/"
-    $mySiteAppNode.SiteCollections.SiteCollection.SearchUrl = "$mySiteUrl/search" 
-}
-
 
 # Populate Server/Service Architecture
 $numServers = Read-Host "How many servers are in this Farm? "
@@ -267,6 +275,14 @@ $apps = ""
 
 if($Edition -eq "Foundation")
 {   
+    # Remove the Search Service user from the Managed Accounts Node since it is not needed for Foundation
+    $searchUser = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'SearchService']")
+    $searchUser.ParentNode.RemoveChild($searchUser) | Out-Null
+
+    $searchUser = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'MySiteHost']")
+    $searchUser.ParentNode.RemoveChild($searchUser) | Out-Null
+    
+    
     for($i=1; $i -le $numServers; $i++)
     {
         $serverName = Read-Host "What is the name of Server $i ? "   
@@ -595,7 +611,8 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
                         $AutoSPXML.Configuration.Farm.CentralAdmin.SetAttribute("Provision", $serverName)
                   } 
                 6 {
-                        $AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SetAttribute("Provision", $serverName)
+                        Write-Host  -ForegroundColor Yellow "User Profile Service App Provisioning is currently disabled in this script. Please provision manually once the Farm is built. Thanks!" 
+                        #$AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SetAttribute("Provision", $serverName)
                   }        
             }
         
@@ -616,12 +633,15 @@ $ca = $AutoSPXML.Configuration.Farm.CentralAdmin.Provision
 "<b>Central Admin:</b> $ca" | out-file "$text" -Append
 
 $indexCrawl = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.IndexComponent.Server.Name
-$indexScrubbed = $indexCrawl.Replace(" ", ", ")
-"<b>Index Crawler:</b> $indexScrubbed" | out-file "$text" -Append
+if(![string]::IsNullOrEmpty($indexCrawl))
+{
+    $indexScrubbed = $indexCrawl.Replace(" ", ", ")
+    "<b>Index Crawler:</b> $indexScrubbed" | out-file "$text" -Append
 
-$query = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
-$queryScrubbed = $query.Replace(" ", ", ")
-"<b>Query:</b> $queryScrubbed" | out-file "$text" -Append
+    $query = $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.EnterpriseSearchServiceApplications.EnterpriseSearchServiceApplication.QueryComponent.Server.Name
+    $queryScrubbed = $query.Replace(" ", ", ")
+    "<b>Query:</b> $queryScrubbed" | out-file "$text" -Append
+}
 
 $dbServer = $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance
 "<b>Database:</b> $dbServer" | out-file "$text" -Append
