@@ -611,8 +611,8 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
                         $AutoSPXML.Configuration.Farm.CentralAdmin.SetAttribute("Provision", $serverName)
                   } 
                 6 {
-                        Write-Host  -ForegroundColor Yellow "User Profile Service App Provisioning is currently disabled in this script. Please provision manually once the Farm is built. Thanks!" 
-                        #$AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SetAttribute("Provision", $serverName)
+                        #Write-Host  -ForegroundColor Yellow "User Profile Service App Provisioning is currently disabled in this script. Please provision manually once the Farm is built. Thanks!" 
+                        $AutoSPXML.Configuration.ServiceApps.UserProfileServiceApp.SetAttribute("Provision", $serverName)
                   }        
             }
         

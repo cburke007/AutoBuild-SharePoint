@@ -16,26 +16,26 @@ function CreateADUser
     #Check to see if the Service Accounts OU already exists
     $ouSA = "OU=Service Accounts," + $dom.DistinguishedName
     $ouSP = "OU=SharePoint," + $ouSA
-    $ouSAExists = Get-ADOrganizationalUnit -identity $ouSA
+    $ouSAExists = Get-ADOrganizationalUnit -Filter {distinguishedname -eq $ouSA}
 
     #If the Service Accounts does not exist, create both OU's
     if ([string]::IsNullOrEmpty($ouSAExists))
     {
-        New-ADOrganizationalUnit -Name "Service Accounts" -Path $ouSA
+        New-ADOrganizationalUnit -Name "Service Accounts" -Path $dom.DistinguishedName | Out-Null
         
-        New-ADOrganizationalUnit -Name "SharePoint" -Path $ouSP    
+        New-ADOrganizationalUnit -Name "SharePoint" -Path $ouSA | Out-Null
     }
     #Otherwise create just the SharePoint OU
     else
     {
         #Check to see if the SharePoint OU already exists
         $ouSP = "OU=SharePoint,OU=Service Accounts," + $dom.DistinguishedName
-        $ouSPExists = Get-ADOrganizationalUnit -identity $ouSP
+        $ouSPExists = Get-ADOrganizationalUnit -Filter {distinguishedname -eq $ouSP}
 
         #If the SharePoint OU does not exist, Create it
         if ([string]::IsNullOrEmpty($ouSPExists))
         {
-            New-ADOrganizationalUnit -Name "SharePoint" -Path $ouSP
+            New-ADOrganizationalUnit -Name "SharePoint" -Path $ouSA | Out-Null
         }  
     }
     
