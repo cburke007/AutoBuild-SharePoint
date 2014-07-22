@@ -1,6 +1,9 @@
 #########################################################################################################
 # BEGIN FUNCTIONS
 #########################################################################################################
+Import-Module Servermanager
+
+Add-WindowsFeature RSAT | Out-Null
 
 function CreateADUser
 {
@@ -18,16 +21,30 @@ function CreateADUser
     $ouSP = "OU=SharePoint," + $ouSA
     $ouSAExists = Get-ADOrganizationalUnit -Filter {distinguishedname -eq $ouSA}
 
+    Write-Host -ForegroundColor Yellow "Creating Org Units in Active Directory..."
     #If the Service Accounts does not exist, create both OU's
     if ([string]::IsNullOrEmpty($ouSAExists))
     {
-        New-ADOrganizationalUnit -Name "Service Accounts" -Path $dom.DistinguishedName | Out-Null
-        
-        New-ADOrganizationalUnit -Name "SharePoint" -Path $ouSA | Out-Null
+        Write-Host -ForegroundColor Yellow "Service Accounts OU does not exist!"
+        try{
+            Write-Host -ForegroundColor Yellow "Creating Service Accounts OU..."
+            New-ADOrganizationalUnit -Name "Service Accounts" -Path $dom.DistinguishedName | Out-Null
+            Write-Host -ForegroundColor Green "Service Accounts OU successfully created!"
+        }
+        catch{Write-Host -ForegroundColor Red "Failed to create Service Accounts OU. Check network and permissions for Active Directory."; break}
+
+        try{
+            Write-Host -ForegroundColor Yellow "Creating SharePoint OU..."
+            New-ADOrganizationalUnit -Name "SharePoint" -Path $ouSA | Out-Null
+            Write-Host -ForegroundColor Green "SharePoint OU successfully created!"
+        }
+        catch{Write-Host -ForegroundColor Red "Failed to create SharePoint OU. Check network and permissions for Active Directory."; break}
     }
     #Otherwise create just the SharePoint OU
     else
     {
+        Write-Host -ForegroundColor Green "Service Accounts OU already exists!"
+
         #Check to see if the SharePoint OU already exists
         $ouSP = "OU=SharePoint,OU=Service Accounts," + $dom.DistinguishedName
         $ouSPExists = Get-ADOrganizationalUnit -Filter {distinguishedname -eq $ouSP}
@@ -35,28 +52,45 @@ function CreateADUser
         #If the SharePoint OU does not exist, Create it
         if ([string]::IsNullOrEmpty($ouSPExists))
         {
+           try{
+            Write-Host -ForegroundColor Yellow "Creating SharePoint OU..."
             New-ADOrganizationalUnit -Name "SharePoint" -Path $ouSA | Out-Null
+            Write-Host -ForegroundColor Green "SharePoint OU successfully created!"
+        }
+        catch{Write-Host -ForegroundColor Red "Failed to create SharePoint OU. Check network and permissions for Active Directory."; break}
         }  
     }
     
     #Check to see if the user already exists
+    Write-Host -ForegroundColor Yellow "Checking to see if $AccountName already exists..."
     $UserExists = Get-ADUser -filter {SamAccountName -eq $AccountName}
       
     
     #If the user exists do nothing otherwise create the new user account
     if(![string]::IsNullOrEmpty($UserExists))
     {        
-        Write-Output "User $AccountName exists! Skipping..."      
+        Write-Host -ForegroundColor Green "User $AccountName exists! Just need the password..."      
     }
     else
-    {                     
+    {                       
         $userPrincipalName = $AccountName + $UPN
-        # User Creation
-        $newUser = New-ADUser $AccountName -PassThru -Path $ouSP -SamAccountName $AccountName -UserPrincipalName $userPrincipalName -DisplayName $AccountName -GivenName $AccountName -Enabled $True -PasswordNeverExpires $True -AccountPassword (ConvertTo-SecureString $Password -AsPlainText -Force)
+        
+        try{
+            # User Creation
+            Write-Host -ForegroundColor Yellow "User $AccountName does not exist. Creating..."
+            $newUser = New-ADUser $AccountName -PassThru -Path $ouSP -SamAccountName $AccountName -UserPrincipalName $userPrincipalName -DisplayName $AccountName -GivenName $AccountName -Enabled $True -PasswordNeverExpires $True -AccountPassword (ConvertTo-SecureString $Password -AsPlainText -Force)
+            Write-Host -ForegroundColor Green "User $AccountName created successfully!"
+        }
+        catch{Write-Host -ForegroundColor Red "Failed to create user $AccountName! Verify AD connectivity and permissions and try again..."; break}
 
         if($type -eq "Farm Admin")
         {
-            Add-ADGroupMember -Identity "Domain Admins" -Member $newUser
+            try{
+                Write-Host -ForegroundColor Yellow "Adding $AccountName to the Domain Admins group..."
+                Add-ADGroupMember -Identity "Domain Admins" -Member $newUser
+                Write-Host -ForegroundColor Green "User $AccountName added to Domain Admins successfully!"
+            }
+            catch{Write-Host -ForegroundColor Red "Failed to add user $AccountName to Domain Admins Group! Verify AD connectivity and permissions and try again..."; break}
         }
     } 
 }
@@ -145,10 +179,13 @@ $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
 $bits = Get-Item $env:dp0 | Split-Path -Parent
 $env:AutoSPPath = $bits + "\AutoSPInstaller"
 
+Write-Host -ForegroundColor Yellow "Detecting Active Directory Password Length Requirements..."
 $RootDSE = Get-ADRootDSE
 $PasswordPolicy = Get-ADObject $RootDSE.defaultNamingContext -Property minPwdAge, maxPwdAge, minPwdLength, pwdHistoryLength, pwdProperties
 if($PasswordPolicy.minPwdLength -lt 12){$passlength = 12}
 else{$passLength = $PasswordPolicy.minPwdLength}
+
+Write-Host -ForegroundColor Green "Minimum Password Length requirement is currently set to $passLength"
 
 $netbios = (Get-ADDomain).NetBiosName
 
@@ -445,6 +482,6 @@ if($AutoSPXML.Configuration.Install.SKU -eq "Enterprise")
 
 $AutoSPXML.Save("$env:AutoSPPath\AutoSPInstallerInput.xml")
 
-Write-Host -ForegroundColor Yellow "Service Accounts have been created. Please log in as "$netbios\$FarmAdmin" $FarmAdminPass"
+Write-Host -ForegroundColor Green "Service Accounts have been created! Please log in as "$netbios\$FarmAdmin" $FarmAdminPass"
 
 break
