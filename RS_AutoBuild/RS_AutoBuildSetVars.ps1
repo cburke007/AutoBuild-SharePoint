@@ -275,13 +275,6 @@ $apps = ""
 
 if($Edition -eq "Foundation")
 {   
-    # Remove the Search Service user from the Managed Accounts Node since it is not needed for Foundation
-    $searchUser = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'SearchService']")
-    $searchUser.ParentNode.RemoveChild($searchUser) | Out-Null
-
-    $searchUser = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'MySiteHost']")
-    $searchUser.ParentNode.RemoveChild($searchUser) | Out-Null
-    
     
     for($i=1; $i -le $numServers; $i++)
     {

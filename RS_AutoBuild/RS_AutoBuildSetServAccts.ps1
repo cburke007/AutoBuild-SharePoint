@@ -260,12 +260,9 @@ $UserLogEntry | out-file "$text" -append
 
 if($AutoSPXML.Configuration.Install.SKU -eq "Foundation")
 {
-    $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'searchservice']")
+    $mgdAcctNode = $AutoSPXML.SelectSingleNode("//Configuration/Farm/ManagedAccounts/ManagedAccount[@CommonName = 'SearchService']")
     $mgdAcctNode.Username = $netbios + "\" + $FarmAcct
     $mgdAcctNode.Password = "$pass"
-
-    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Account = $netbios + "\" + $FarmAcct
-    $AutoSPXML.Configuration.ServiceApps.EnterpriseSearchService.Password = "$pass"
 }
 
 $AutoSPXML.Configuration.Farm.Account.Username = $netbios + "\" + $FarmAcct
@@ -324,13 +321,7 @@ $portalAppNode.SiteCollections.SiteCollection.Owner = $netbios + "\" + $SiteAdmi
 
 if($AutoSPXML.Configuration.Install.SKU -eq "Foundation")
 {
-    $mySiteNode = $AutoSPXML.Configuration.WebApplications.WebApplication | ?{$_.Type -eq "MySiteHost"}
-	[Void]$mySiteNode.ParentNode.RemoveChild($mySiteNode)
-
     $mgdAcctNode = $AutoSPXML.Configuration.Farm.ManagedAccounts.ManagedAccount | ?{$_.CommonName -eq "MySiteHost"}
-	[Void]$mgdAcctNode.ParentNode.RemoveChild($mgdAcctNode)
-
-    $mgdAcctNode = $AutoSPXML.Configuration.Farm.ManagedAccounts.ManagedAccount | ?{$_.CommonName -eq "searchapppool"}
 	[Void]$mgdAcctNode.ParentNode.RemoveChild($mgdAcctNode)
 }
  

@@ -21,5 +21,9 @@ Set-RSPreReqs
 Function Install-Remote
 {
 
+4) At around line 372 add PrepFoundation in bewteen as shown below
+   PrepForInstall
+   PrepFoundation
+   Run-Install 
 
-4) For AutoSPInstallerGUI - Overwrite both AutoSPinstallerGUI.exe and Prerequisite Check.exe (only two files in the downloaded zip)
+5) For AutoSPInstallerGUI - Overwrite both AutoSPinstallerGUI.exe and Prerequisite Check.exe (only two files in the downloaded zip)
