@@ -5,6 +5,11 @@ Import-Module Servermanager
 
 Add-WindowsFeature RSAT | Out-Null
 
+if ((Get-WmiObject Win32_OperatingSystem).Version -lt 6.2)
+{
+    Import-Module ActiveDirectory
+}
+
 function CreateADUser
 {
 	param([string]$AccountName, [string]$type, [string]$Password)
@@ -179,8 +184,21 @@ $env:dp0 = [System.IO.Path]::GetDirectoryName($0)
 $bits = Get-Item $env:dp0 | Split-Path -Parent
 $env:AutoSPPath = $bits + "\AutoSPInstaller"
 
+
+Try{
+    Write-Host -ForegroundColor Yellow "Connecting to Active Directory..."
+    $RootDSE = Get-ADRootDSE
+    Write-Host -ForegroundColor Green "Successfully connected to Active Directory!"
+}
+Catch{
+    Write-Host -ForegroundColor Red "Failed to connect to Active Directory! Check the following then try the script again:"
+    Write-Host -ForegroundColor Cyan "Is this server correctly added to Active Directory?"
+    Write-Host -ForegroundColor Cyan "Is Active Directory Web Services role is installed and functioning on the Domain Controller?"
+    Write-Host -ForegroundColor Cyan "Look for any network issues that might be preventing communication with Active Directory"
+    break
+}
+
 Write-Host -ForegroundColor Yellow "Detecting Active Directory Password Length Requirements..."
-$RootDSE = Get-ADRootDSE
 $PasswordPolicy = Get-ADObject $RootDSE.defaultNamingContext -Property minPwdAge, maxPwdAge, minPwdLength, pwdHistoryLength, pwdProperties
 if($PasswordPolicy.minPwdLength -lt 12){$passlength = 12}
 else{$passLength = $PasswordPolicy.minPwdLength}

@@ -77,9 +77,7 @@ function Set-RSPreReqs
 
 function PrepFoundation
 {
-    param([string]$localPath)
-
-    $xmlInputPath = $localPath + "\" + "AutoSPInstallerInput.xml"
+    $xmlInputPath = $env:dp0 + "\AutoSPInstallerInput.xml"
     $xmlinput = [xml](Get-Content $xmlInputPath)
     
     $script:configFile = Join-Path -Path (Get-Item $env:TEMP).FullName -ChildPath $($xmlinput.Configuration.Install.ConfigFile)

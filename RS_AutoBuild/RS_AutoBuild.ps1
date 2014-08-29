@@ -51,7 +51,7 @@ if([string]::IsNullOrEmpty($AutoSPXML.Configuration.Farm.Database.DBAlias.DBPort
 {
     $dbPort = "1433"
 }
-else{$dbPort = $AutoSPXML.Configuration.Farm.Database.DBAlias.DBInstance}
+else{$dbPort = $AutoSPXML.Configuration.Farm.Database.DBAlias.DBPort}
 
 $sqlTest = New-Object System.Net.Sockets.TcpClient
 Try
@@ -67,7 +67,10 @@ Catch
 }
 Finally
 {
-    $sqlTest.Dispose()
+    if ((Get-WmiObject Win32_OperatingSystem).Version -gt 6.2)
+    {
+        $sqlTest.Dispose()
+    }
 }
 
 $cInfo = (get-content "$env:RSScriptPath\COREInfo.txt" -EA 0)

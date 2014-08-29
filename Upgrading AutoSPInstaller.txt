@@ -21,9 +21,12 @@ Set-RSPreReqs
 Function Install-Remote
 {
 
-4) At around line 372 add PrepFoundation in bewteen as shown below
+4) At around line 373 add PrepFoundation If statement in bewteen PreForInstall and Run-Install as shown below
    PrepForInstall
-   PrepFoundation
+   if($xmlinput.Configuration.Install.SKU -eq "Foundation")
+        {
+            PrepFoundation
+        }
    Run-Install 
 
 5) For AutoSPInstallerGUI - Overwrite both AutoSPinstallerGUI.exe and Prerequisite Check.exe (only two files in the downloaded zip)

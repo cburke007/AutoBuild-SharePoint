@@ -369,7 +369,10 @@ If (MatchComputerName $farmServers $env:COMPUTERNAME)
             Write-Host -ForegroundColor White " - SharePoint $spYear binaries are"($spInstalled -replace "True","already" -replace "False","not yet") "installed."
         }
         PrepForInstall
-        PrepFoundation
+        if($xmlinput.Configuration.Install.SKU -eq "Foundation")
+        {
+            PrepFoundation
+        }
         Run-Install
         Write-Host -ForegroundColor White " - SharePoint $spYear binary file installation done!"
 
