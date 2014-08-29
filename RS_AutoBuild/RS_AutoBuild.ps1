@@ -1,5 +1,5 @@
 #* FileName: RS_AutoBuild.ps1
-#* Version 6.3
+#* Version 6.5 BETA
 #*=============================================
 #* Script Name: [RS_AutoBuild.ps1]
 #* Created: [4/2/2013]
@@ -26,8 +26,6 @@ Start-Transcript -Path $env:RSScriptPath\ScriptPrep.log -Append -Force
 
 Import-Module ServerManager
 Add-WindowsFeature -Name Telnet-Client | Out-Null
-
-
 
 # Get the AutoSPInstaller Config XML file
 $AutoSPXML = [xml](get-content "$env:AutoSPPath\AutoSPInstallerInput.xml" -EA 0)
@@ -105,8 +103,10 @@ switch($VerChoice)
         #Start-Process -wait "$env:AutoSPPath\AutoSPInstallerLaunch.bat"
         .$env:AutoSPPath\AutoSPInstallerMain.ps1 "$env:AutoSPPath\AutoSPInstallerInput.xml"
         
+        Start-Transcript -Path $env:RSScriptPath\ScriptPost.log -Append -Force
         # Post Install Configuration
         .$env:RSScriptPath\RS_AutoBuildPost.ps1
+        Stop-Transcript
     }
     2 {
         # Validate Config through GUI
@@ -120,8 +120,10 @@ switch($VerChoice)
             #Start-Process -wait "$env:AutoSPPath\AutoSPInstallerLaunch.bat"
             .$env:AutoSPPath\AutoSPInstallerMain.ps1 "$env:AutoSPPath\AutoSPInstallerInput.xml"
             
+            Start-Transcript -Path $env:RSScriptPath\ScriptPost.log -Append -Force
             # Post Install Configuration
             .$env:RSScriptPath\RS_AutoBuildPost.ps1
+            Stop-Transcript
         }
         else{Write-Host -ForegroundColor Red "Exiting..."; break}
     }
@@ -131,8 +133,10 @@ switch($VerChoice)
                 #Start-Process -wait "$env:AutoSPPath\AutoSPInstallerLaunch.bat"
                 .$env:AutoSPPath\AutoSPInstallerMain.ps1 "$env:AutoSPPath\AutoSPInstallerInput.xml"
                 
+                Start-Transcript -Path $env:RSScriptPath\ScriptPost.log -Append -Force
                 # Post Install Configuration
                 .$env:RSScriptPath\RS_AutoBuildPost.ps1
+                Stop-Transcript
     }
 }
 
