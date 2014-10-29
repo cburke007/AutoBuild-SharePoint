@@ -364,7 +364,11 @@ if($Edition -eq "Foundation")
 					    {
 						    $FarmDBServerAlias = "SharePointSQL"
 					    }
-                        if(-not [string]::IsNullOrEmpty($customInstanceName))
+                        if(-not [string]::IsNullOrEmpty($customSQLPort))
+                        {
+                            $DBServerInstance = $serverName
+                        }
+                        elseif(-not [string]::IsNullOrEmpty($customInstanceName))
                         {
                             $DBServerInstance = $serverName + "\" + $customInstanceName
                         }
@@ -588,9 +592,28 @@ elseif($Edition -eq "Standard" -or $Edition -eq "Enterprise")
 					    {
 						    $FarmDBServerAlias = "SharePointSQL"
 					    }
-                        if(-not [string]::IsNullOrEmpty($customInstanceName))
+                        if(-not [string]::IsNullOrEmpty($customSQLPort))
+                        {
+                            $DBServerInstance = $serverName
+                        }
+                        elseif(-not [string]::IsNullOrEmpty($customInstanceName))
                         {
                             $DBServerInstance = $serverName + "\" + $customInstanceName
+                        }
+                        else{$DBServerInstance = $serverName}
+                        
+                        
+                        
+                        
+                        
+                        
+                        if(-not [string]::IsNullOrEmpty($customInstanceName))
+                        {
+                            if([string]::IsNullOrEmpty($customSQLPort))
+					        {
+                                $DBServerInstance = $serverName + "\" + $customInstanceName
+                            }
+                            else{$DBServerInstance = $serverName}
                         }
                         else{$DBServerInstance = $serverName}
 

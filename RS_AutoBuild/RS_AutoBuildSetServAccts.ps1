@@ -36,14 +36,14 @@ function CreateADUser
             New-ADOrganizationalUnit -Name "Service Accounts" -Path $dom.DistinguishedName | Out-Null
             Write-Host -ForegroundColor Green "Service Accounts OU successfully created!"
         }
-        catch{Write-Host -ForegroundColor Red "Failed to create Service Accounts OU. Check network and permissions for Active Directory."; break}
+        catch{Throw "Failed to create Service Accounts OU. Check network and permissions for Active Directory."}
 
         try{
             Write-Host -ForegroundColor Yellow "Creating SharePoint OU..."
             New-ADOrganizationalUnit -Name "SharePoint" -Path $ouSA | Out-Null
             Write-Host -ForegroundColor Green "SharePoint OU successfully created!"
         }
-        catch{Write-Host -ForegroundColor Red "Failed to create SharePoint OU. Check network and permissions for Active Directory."; break}
+        catch{Throw "Failed to create SharePoint OU. Check network and permissions for Active Directory."}
     }
     #Otherwise create just the SharePoint OU
     else
@@ -62,7 +62,7 @@ function CreateADUser
             New-ADOrganizationalUnit -Name "SharePoint" -Path $ouSA | Out-Null
             Write-Host -ForegroundColor Green "SharePoint OU successfully created!"
         }
-        catch{Write-Host -ForegroundColor Red "Failed to create SharePoint OU. Check network and permissions for Active Directory."; break}
+        catch{Throw "Failed to create SharePoint OU. Check network and permissions for Active Directory."}
         }  
     }
     
@@ -86,7 +86,7 @@ function CreateADUser
             $newUser = New-ADUser $AccountName -PassThru -Path $ouSP -SamAccountName $AccountName -UserPrincipalName $userPrincipalName -DisplayName $AccountName -GivenName $AccountName -Enabled $True -PasswordNeverExpires $True -AccountPassword (ConvertTo-SecureString $Password -AsPlainText -Force)
             Write-Host -ForegroundColor Green "User $AccountName created successfully!"
         }
-        catch{Write-Host -ForegroundColor Red "Failed to create user $AccountName! Verify AD connectivity and permissions and try again..."; break}
+        catch{Throw "Failed to create user $AccountName! Verify AD connectivity and permissions and try again..."}
 
         if($type -eq "Farm Admin")
         {
@@ -95,7 +95,7 @@ function CreateADUser
                 Add-ADGroupMember -Identity "Domain Admins" -Member $newUser
                 Write-Host -ForegroundColor Green "User $AccountName added to Domain Admins successfully!"
             }
-            catch{Write-Host -ForegroundColor Red "Failed to add user $AccountName to Domain Admins Group! Verify AD connectivity and permissions and try again..."; break}
+            catch{Throw "Failed to add user $AccountName to Domain Admins Group! Verify AD connectivity and permissions and try again..."}
         }
     } 
 }
@@ -194,8 +194,9 @@ Catch{
     Write-Host -ForegroundColor Red "Failed to connect to Active Directory! Check the following then try the script again:"
     Write-Host -ForegroundColor Cyan "Is this server correctly added to Active Directory?"
     Write-Host -ForegroundColor Cyan "Is Active Directory Web Services role is installed and functioning on the Domain Controller?"
-    Write-Host -ForegroundColor Cyan "Look for any network issues that might be preventing communication with Active Directory"
-    break
+    Write-Host -ForegroundColor Cyan "Is this a DMZ config? If so, is port 9389 to Active Directory Web Services open on the Firewall between SP and AD servers?"
+    Write-Host -ForegroundColor Cyan "Look for any other network issues that might be preventing communication with Active Directory, and try again..."
+    Throw
 }
 
 Write-Host -ForegroundColor Yellow "Detecting Active Directory Password Length Requirements..."
